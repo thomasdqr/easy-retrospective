@@ -1,0 +1,49 @@
+{
+  "rules": {
+    "sessions": {
+      "$sessionId": {
+        "isRevealed": {
+          ".read": true,
+          ".write": true,
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    },
+    "stickyNotes": {
+      "$sessionId": {
+        ".read": true,
+        "$noteId": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['id', 'content', 'authorId', 'position', 'color']) && newData.child('id').isString() && newData.child('content').isString() && newData.child('authorId').isString() && newData.child('position').hasChildren(['x', 'y']) && newData.child('position/x').isNumber() && newData.child('position/y').isNumber() && newData.child('color').isString()"
+        }
+      }
+    },
+    "notesPosition": {
+      "$sessionId": {
+        ".read": true,
+        "$noteId": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['x', 'y']) && newData.child('x').isNumber() && newData.child('y').isNumber()"
+        }
+      }
+    },
+    "notesMoving": {
+      "$sessionId": {
+        ".read": true,
+        "$noteId": {
+          ".write": true,
+          ".validate": "newData.isString() || newData.val() == null"
+        }
+      }
+    },
+    "cursors": {
+      "$sessionId": {
+        ".read": true,
+        "$userId": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['x', 'y', 'lastUpdate']) && newData.child('x').isNumber() && newData.child('y').isNumber() && newData.child('lastUpdate').isNumber()"
+        }
+      }
+    }
+  }
+}
