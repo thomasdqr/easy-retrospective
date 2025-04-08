@@ -160,21 +160,27 @@ export const createNotePositionUpdater = (sessionId: string, noteId: string) => 
     lastPosition = { x, y };
     
     const now = Date.now();
-    if (timeout || now - lastUpdateTime < 16) return; // Skip if update pending or too soon (16ms = ~60fps)
+    // Reduce throttling threshold from 16ms to 8ms to send more frequent updates
+    if (timeout || now - lastUpdateTime < 8) return; // ~120fps instead of 60fps
     
     const updatePosition = async () => {
       if (!lastPosition) return;
       
       const positionToUpdate = { ...lastPosition };
       const positionRef = ref(realtimeDb, `notesPosition/${sessionId}/${noteId}`);
-      await set(positionRef, positionToUpdate);
       
-      lastUpdateTime = Date.now();
-      timeout = null;
-      
-      // If position changed during update, schedule another update
-      if (lastPosition.x !== positionToUpdate.x || lastPosition.y !== positionToUpdate.y) {
-        setTimeout(updatePosition, 16); // 16ms = ~60fps for smooth appearance
+      try {
+        await set(positionRef, positionToUpdate);
+        lastUpdateTime = Date.now();
+      } catch (error) {
+        console.error("Error updating note position:", error);
+      } finally {
+        timeout = null;
+        
+        // If position changed during update, schedule another update immediately
+        if (lastPosition && (lastPosition.x !== positionToUpdate.x || lastPosition.y !== positionToUpdate.y)) {
+          setTimeout(updatePosition, 0); // Schedule immediately instead of waiting
+        }
       }
     };
     

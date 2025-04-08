@@ -60,6 +60,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const lastPanPosition = useRef({ x: 0, y: 0 });
   const [boardDimensions, setBoardDimensions] = useState({ width: 0, height: 0 });
   const hasPannedRef = useRef<boolean>(false);
+  const initialCenterAppliedRef = useRef<boolean>(false);
 
   // Get the column a sticky note belongs to based on its position
   const getNoteColumn = (notePosition: { x: number; y: number } | undefined): Column | null => {
@@ -96,6 +97,16 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       window.removeEventListener('resize', updateDimensions);
     };
   }, []);
+
+  // Automatically center the whiteboard when it's first loaded
+  useEffect(() => {
+    // Only center once and only after the board dimensions are available
+    if (!initialCenterAppliedRef.current && boardDimensions.width > 0) {
+      const centerPosition = calculateCenterPosition();
+      setPan(centerPosition);
+      initialCenterAppliedRef.current = true;
+    }
+  }, [boardDimensions]);
 
   // Transform cursor positions between viewports
   const transformCursorPosition = (
