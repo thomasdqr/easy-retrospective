@@ -401,4 +401,96 @@ export const updateStickyNoteColor = async (
 ): Promise<void> => {
   const noteColorRef = ref(realtimeDb, `stickyNotes/${sessionId}/${noteId}/color`);
   await set(noteColorRef, color);
+};
+
+/**
+ * Subscribe to columns in a session
+ */
+export const subscribeToColumns = (
+  sessionId: string,
+  onColumnsUpdate: (columns: Record<string, import('../types').Column>) => void
+) => {
+  const path = `columns/${sessionId}`;
+  const columnsRef = ref(realtimeDb, path);
+  
+  // Re-use existing subscription if available
+  if (activeRtSubscriptions[path]) {
+    console.log('Using existing columns subscription');
+    const existingRef = activeRtSubscriptions[path];
+    onValue(existingRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      onColumnsUpdate(data);
+    });
+    
+    return () => {
+      off(existingRef);
+      delete activeRtSubscriptions[path];
+    };
+  }
+  
+  // Create new subscription
+  console.log(`Creating new subscription for columns in session ${sessionId}`);
+  activeRtSubscriptions[path] = columnsRef;
+  
+  onValue(columnsRef, (snapshot) => {
+    const data = snapshot.val() || {};
+    onColumnsUpdate(data);
+  });
+  
+  return () => {
+    off(columnsRef);
+    delete activeRtSubscriptions[path];
+  };
+};
+
+/**
+ * Initialize columns for a new session
+ */
+export const initializeColumns = async (
+  sessionId: string,
+  columns: import('../types').Column[]
+): Promise<void> => {
+  const columnsObj = columns.reduce((acc, column) => {
+    acc[column.id] = column;
+    return acc;
+  }, {} as Record<string, import('../types').Column>);
+  
+  const columnsRef = ref(realtimeDb, `columns/${sessionId}`);
+  await set(columnsRef, columnsObj);
+};
+
+/**
+ * Add a new column to realtime DB
+ */
+export const addColumn = async (
+  sessionId: string,
+  column: import('../types').Column
+): Promise<void> => {
+  const columnRef = ref(realtimeDb, `columns/${sessionId}/${column.id}`);
+  await set(columnRef, column);
+};
+
+/**
+ * Update a column in realtime DB
+ */
+export const updateColumn = async (
+  sessionId: string,
+  columnId: string,
+  updates: Partial<import('../types').Column>
+): Promise<void> => {
+  Object.entries(updates).forEach(async ([key, value]) => {
+    const updateRef = ref(realtimeDb, `columns/${sessionId}/${columnId}/${key}`);
+    await set(updateRef, value);
+  });
+};
+
+/**
+ * Delete a column from realtime DB
+ */
+export const deleteColumn = async (
+  sessionId: string,
+  columnId: string
+): Promise<void> => {
+  const columnRef = ref(realtimeDb, `columns/${sessionId}/${columnId}`);
+  await set(columnRef, null);
 }; 

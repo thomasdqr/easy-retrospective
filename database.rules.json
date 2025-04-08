@@ -9,6 +9,15 @@
         }
       }
     },
+    "columns": {
+      "$sessionId": {
+        ".read": true,
+        ".write": true,
+        "$columnId": {
+          ".validate": "newData.hasChildren(['id', 'title', 'color', 'position']) && newData.child('id').isString() && newData.child('title').isString() && newData.child('color').isString() && newData.child('position').hasChildren(['x', 'width']) && newData.child('position/x').isNumber() && newData.child('position/width').isNumber()"
+        }
+      }
+    },
     "stickyNotes": {
       "$sessionId": {
         ".read": true,
