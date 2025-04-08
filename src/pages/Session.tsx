@@ -130,23 +130,6 @@ function Session() {
       <div className="mx-auto">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-900">Retrospective Board</h1>
-          {currentUser.isCreator && (
-            <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-lg shadow-sm">
-              <span className="text-sm text-gray-600">{isRevealed ? 'Visible Notes' : 'Hidden Notes'}</span>
-              <label className="inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox"
-                  className="sr-only peer" 
-                  checked={isRevealed}
-                  onChange={handleToggleReveal}
-                />
-                <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:translate-x-[-100%] peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                <span className="ml-2">
-                  {isRevealed ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                </span>
-              </label>
-            </div>
-          )}
         </div>
 
         <div className="flex gap-4">
@@ -157,6 +140,8 @@ function Session() {
                 sessionId={sessionId}
                 currentUser={currentUser}
                 users={sessionBasicInfo.users}
+                isRevealed={isRevealed}
+                onToggleReveal={currentUser.isCreator ? handleToggleReveal : undefined}
               />
             )}
           </div>

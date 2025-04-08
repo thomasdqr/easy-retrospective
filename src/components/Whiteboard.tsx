@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { Focus } from 'lucide-react';
+import { Focus, Eye, EyeOff } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import { nanoid } from 'nanoid';
 import { 
@@ -8,7 +8,6 @@ import {
   createCursorUpdater, 
   subscribeToCursors, 
   subscribeToStickyNotes,
-  subscribeToSessionRevealed,
   updateStickyNoteColor
 } from '../services/realtimeDbService';
 
@@ -16,6 +15,8 @@ interface WhiteboardProps {
   sessionId: string;
   currentUser: User;
   users: Record<string, User>;
+  isRevealed?: boolean;
+  onToggleReveal?: () => void;
 }
 
 // Add interface for cursor data
@@ -48,12 +49,11 @@ const RETROSPECTIVE_COLUMNS: Column[] = [
   }
 ];
 
-function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
+function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggleReveal }: WhiteboardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater>>();
   const [realtimeCursors, setRealtimeCursors] = useState<Record<string, CursorData>>({});
   const [stickyNotes, setStickyNotes] = useState<Record<string, StickyNote>>({});
-  const [isRevealed, setIsRevealed] = useState(true);
   
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -163,15 +163,6 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   useEffect(() => {
     const unsubscribe = subscribeToStickyNotes(sessionId, (stickyNotesData) => {
       setStickyNotes(stickyNotesData);
-    });
-    
-    return unsubscribe;
-  }, [sessionId]);
-
-  // Subscribe to revealed status updates
-  useEffect(() => {
-    const unsubscribe = subscribeToSessionRevealed(sessionId, (revealedStatus) => {
-      setIsRevealed(revealedStatus);
     });
     
     return unsubscribe;
@@ -305,7 +296,7 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Toolbar - moved outside and above the whiteboard */}
-      <div className="py-2 px-4 flex gap-2 bg-gray-50 border-b border-gray-200">
+      <div className="py-2 px-4 flex gap-2 bg-gray-50 border-b border-gray-200 justify-between">
         <button
           onClick={() => setPan(calculateCenterPosition())}
           className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm flex items-center gap-1"
@@ -314,6 +305,20 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
           <Focus className="w-4 h-4" />
           <span className="text-sm">Center</span>
         </button>
+        
+        {currentUser.isCreator && onToggleReveal && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">{isRevealed ? 'Visible Notes' : 'Hidden Notes'}</span>
+            <button
+              onClick={onToggleReveal}
+              className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm flex items-center gap-1"
+              title={isRevealed ? "Hide Notes" : "Show Notes"}
+            >
+              {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              <span className="text-sm">{isRevealed ? "Hide" : "Show"}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Whiteboard */}
