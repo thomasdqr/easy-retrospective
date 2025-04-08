@@ -127,7 +127,7 @@ function Session() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100 p-4">
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-900">Retrospective Board</h1>
           {currentUser.isCreator && (
@@ -151,7 +151,7 @@ function Session() {
 
         <div className="flex gap-4">
           {/* Main whiteboard area */}
-          <div className="flex-1 bg-white rounded-lg shadow-lg min-h-[calc(100vh-8rem)]">
+          <div className="flex-1 bg-white rounded-lg shadow-lg min-h-[calc(100vh-85px)]">
             {sessionBasicInfo && sessionId && (
               <Whiteboard
                 sessionId={sessionId}
