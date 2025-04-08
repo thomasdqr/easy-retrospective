@@ -9,7 +9,6 @@ import {
   setNoteMovingStatus,
   subscribeToNotesMoving,
   subscribeToNotesPosition,
-  updateStickyNoteColor
 } from '../services/realtimeDbService';
 
 interface StickyNoteProps {
@@ -106,13 +105,23 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
     // Mark this note as being moved by current user using Realtime DB
     await setNoteMovingStatus(sessionId, note.id, currentUser.id);
 
-    const startX = e.clientX - position.x;
-    const startY = e.clientY - position.y;
+    // Get the starting position in client coordinates
+    const startX = e.clientX;
+    const startY = e.clientY;
+    
+    // Store original position
+    const originalX = position.x;
+    const originalY = position.y;
 
     const handleMouseMove = (e: MouseEvent) => {
+      // Calculate the delta from the starting position
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      // Apply the delta to the original position to get absolute coordinates
       const newPosition = {
-        x: (e.clientX - startX) / 1,
-        y: (e.clientY - startY) / 1
+        x: originalX + deltaX,
+        y: originalY + deltaY
       };
       
       setPosition(newPosition);

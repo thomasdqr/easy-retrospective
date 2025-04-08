@@ -32,19 +32,19 @@ const RETROSPECTIVE_COLUMNS: Column[] = [
     id: 'went-well',
     title: '✅ What Went Well',
     color: 'bg-green-200',
-    position: { x: 0, width: 33.33 }
+    position: { x: 0, width: 350 }
   },
   {
     id: 'needs-improvement',
     title: '❌ What Needs Improvement',
     color: 'bg-red-200',
-    position: { x: 33.33, width: 33.33 }
+    position: { x: 350, width: 350 }
   },
   {
     id: 'action-items',
     title: '💪 What can we do better?',
     color: 'bg-blue-200',
-    position: { x: 66.66, width: 33.34 }
+    position: { x: 700, width: 350 }
   }
 ];
 
@@ -65,16 +65,13 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   const getNoteColumn = (notePosition: { x: number; y: number } | undefined): Column | null => {
     if (!boardRef.current || !notePosition) return null;
     
-    const boardWidth = boardDimensions.width;
+    // Use absolute position instead of percentage to determine column
+    const absoluteX = notePosition.x;
     
-    // When determining column by click position, we need to adjust for the current
-    // board dimensions with the position in the viewport (not panned coordinates)
-    const percentageAcross = (notePosition.x / boardWidth) * 100;
-    
-    // Find the column that contains this position
+    // Find the column that contains this position based on fixed width
     return RETROSPECTIVE_COLUMNS.find(column => 
-      percentageAcross >= column.position.x && 
-      percentageAcross < (column.position.x + column.position.width)
+      absoluteX >= column.position.x && 
+      absoluteX < (column.position.x + column.position.width)
     ) || null;
   };
   
@@ -110,8 +107,8 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
 
     // Convert from other user's viewport to our viewport
     return {
-      x: cursor.x - cursorPan.x + localPan.x,
-      y: cursor.y - cursorPan.y + localPan.y
+      x: cursor.x + cursorPan.x + localPan.x,
+      y: cursor.y + cursorPan.y + localPan.y
     };
   };
 
@@ -196,8 +193,8 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
 
       // Send cursor position along with current pan state
       cursorUpdateRef.current({
-        x,
-        y,
+        x: x - pan.x,
+        y: y - pan.y,
         pan,
         lastUpdate: Date.now()
       });
@@ -322,13 +319,13 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
           }}
         >
           {/* Column backgrounds, headers, and vertical dividers */}
-          <div className="absolute inset-0 flex h-full">
+          <div className="absolute inset-0 flex h-full" style={{ width: `${RETROSPECTIVE_COLUMNS.length * 350}px` }}>
             {RETROSPECTIVE_COLUMNS.map((column, index) => (
               <div
                 key={column.id}
                 className="h-full relative"
                 style={{ 
-                  width: `${column.position.width}%`
+                  width: `${column.position.width}px`
                 }}
               >
                 {/* Column background */}
