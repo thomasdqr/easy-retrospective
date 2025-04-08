@@ -112,6 +112,23 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
     };
   };
 
+  // Calculate the center position for resetting view
+  const calculateCenterPosition = () => {
+    if (!boardRef.current) return { x: 0, y: 0 };
+    
+    const containerRect = boardRef.current.parentElement?.getBoundingClientRect();
+    if (!containerRect) return { x: 0, y: 0 };
+    
+    // Total width of all columns
+    const totalBoardWidth = RETROSPECTIVE_COLUMNS.length * 350;
+    
+    // Center horizontally by calculating the offset needed
+    const centerX = (containerRect.width - totalBoardWidth) / 2;
+    
+    // For vertical centering, just return to top since columns extend to full height
+    return { x: centerX, y: 0 };
+  };
+
   // Memoize sticky notes array to prevent unnecessary re-renders
   const stickyNotesArray = useMemo(() => {
     return Object.values(stickyNotes)
@@ -286,15 +303,16 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   };
 
   return (
-    <div className="relative w-full h-full">
-      {/* Toolbar */}
-      <div className="absolute top-4 left-4 z-30 flex gap-2">
+    <div className="relative w-full h-full flex flex-col">
+      {/* Toolbar - moved outside and above the whiteboard */}
+      <div className="py-2 px-4 flex gap-2 bg-gray-50 border-b border-gray-200">
         <button
-          onClick={() => setPan({ x: 0, y: 0 })}
-          className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50"
-          title="Reset View"
+          onClick={() => setPan(calculateCenterPosition())}
+          className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm flex items-center gap-1"
+          title="Center View"
         >
-          <Focus className="w-5 h-5" />
+          <Focus className="w-4 h-4" />
+          <span className="text-sm">Center</span>
         </button>
       </div>
 
@@ -304,7 +322,7 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative"
+        className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative flex-grow"
         style={{
           cursor: isPanning ? 'grabbing' : 'default'
         }}
