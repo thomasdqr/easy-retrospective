@@ -133,7 +133,9 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   }, [sessionId, currentUser.id, pan]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) { // Middle mouse button or Alt + Left click
+    // Only enable panning when clicking directly on the sticky notes container
+    // and not on any sticky notes themselves
+    if (e.button === 0 && e.target === boardRef.current) {
       e.preventDefault();
       setIsPanning(true);
       lastPanPosition.current = { x: e.clientX, y: e.clientY };
@@ -223,7 +225,6 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
 
       {/* Whiteboard */}
       <div
-        ref={boardRef}
         onClick={handleAddNote}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -262,6 +263,7 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
 
         {/* Sticky notes container */}
         <div
+          ref={boardRef}
           className="absolute inset-0"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px)`,
