@@ -31,6 +31,8 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   const contentUpdaterRef = useRef<ReturnType<typeof createNoteContentUpdater>>();
   const positionUpdaterRef = useRef<ReturnType<typeof createNotePositionUpdater>>();
   const localPositionRef = useRef(note.position);
+  const justReleasedRef = useRef(false);
+  const justReleasedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Setup the updaters when component mounts
   useEffect(() => {
@@ -64,7 +66,8 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
       // Only update our position if:
       // 1. Someone else is moving the note (real-time updates while they drag)
       // 2. We're not currently dragging ourselves
-      if ((isBeingMovedBySomeoneElse || !isDragging)) {
+      // 3. We didn't just release the note (to prevent position jitter)
+      if (isBeingMovedBySomeoneElse || (!isDragging && !justReleasedRef.current)) {
         setPosition(notesPositions[note.id]);
         localPositionRef.current = notesPositions[note.id];
       }
@@ -74,7 +77,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   // Update local position when note's position changes in the database
   useEffect(() => {
     // Initialize with note position on first load
-    if (!isDragging) {
+    if (!isDragging && !justReleasedRef.current) {
       setPosition(note.position);
       localPositionRef.current = note.position;
     }
@@ -91,6 +94,13 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
     // If someone else is moving the note, don't allow moving
     if (notesMoving[note.id] && notesMoving[note.id] !== currentUser.id) return;
     
+    // Clear any existing justReleased timeout
+    if (justReleasedTimeoutRef.current) {
+      clearTimeout(justReleasedTimeoutRef.current);
+      justReleasedTimeoutRef.current = null;
+    }
+    
+    justReleasedRef.current = false;
     setIsDragging(true);
 
     // Mark this note as being moved by current user using Realtime DB
@@ -124,12 +134,22 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
         x: localPositionRef.current.x,
         y: localPositionRef.current.y
       };
+      
+      // Set flag to ignore position updates from server temporarily
+      justReleasedRef.current = true;
 
       // First clear the moving flag
       await setNoteMovingStatus(sessionId, note.id, null);
       
       // Then set final position in database for persistence
       await setFinalNotePosition(sessionId, note.id, finalPosition);
+      
+      // Set a timeout to re-enable position updates from server after a delay
+      // This gives time for our final position to be the one that sticks
+      justReleasedTimeoutRef.current = setTimeout(() => {
+        justReleasedRef.current = false;
+        justReleasedTimeoutRef.current = null;
+      }, 500); // Keep local position for 500ms after releasing
     };
 
     document.addEventListener('mousemove', handleMouseMove);
