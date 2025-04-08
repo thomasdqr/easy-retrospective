@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { User, StickyNote } from '../types';
-import { Plus, MoveHorizontal } from 'lucide-react';
+import { User, StickyNote, Column } from '../types';
+import { MoveHorizontal } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import { nanoid } from 'nanoid';
 import { 
@@ -8,7 +8,8 @@ import {
   createCursorUpdater, 
   subscribeToCursors, 
   subscribeToStickyNotes,
-  subscribeToSessionRevealed
+  subscribeToSessionRevealed,
+  updateStickyNoteColor
 } from '../services/realtimeDbService';
 
 interface WhiteboardProps {
@@ -25,9 +26,30 @@ interface CursorData {
   lastUpdate: number;
 }
 
+// Define retrospective columns
+const RETROSPECTIVE_COLUMNS: Column[] = [
+  {
+    id: 'went-well',
+    title: '✅ What Went Well',
+    color: 'bg-green-200',
+    position: { x: 0, width: 33.33 }
+  },
+  {
+    id: 'needs-improvement',
+    title: '❌ What Needs Improvement',
+    color: 'bg-red-200',
+    position: { x: 33.33, width: 33.33 }
+  },
+  {
+    id: 'action-items',
+    title: '🔄 Action Items',
+    color: 'bg-blue-200',
+    position: { x: 66.66, width: 33.34 }
+  }
+];
+
 function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
-  const [isAddingNote, setIsAddingNote] = useState(false);
   const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater>>();
   const [realtimeCursors, setRealtimeCursors] = useState<Record<string, CursorData>>({});
   const [stickyNotes, setStickyNotes] = useState<Record<string, StickyNote>>({});
@@ -36,6 +58,46 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const lastPanPosition = useRef({ x: 0, y: 0 });
+  const [boardDimensions, setBoardDimensions] = useState({ width: 0, height: 0 });
+  const hasPannedRef = useRef<boolean>(false);
+
+  // Get the column a sticky note belongs to based on its position
+  const getNoteColumn = (notePosition: { x: number; y: number }): Column | null => {
+    if (!boardRef.current) return null;
+    
+    const boardWidth = boardDimensions.width;
+    
+    // Calculate the percentage across the board
+    const percentageAcross = (notePosition.x / boardWidth) * 100;
+    
+    // Find the column that contains this position
+    return RETROSPECTIVE_COLUMNS.find(column => 
+      percentageAcross >= column.position.x && 
+      percentageAcross < (column.position.x + column.position.width)
+    ) || null;
+  };
+  
+  // Update board dimensions when the board is resized
+  useEffect(() => {
+    if (!boardRef.current) return;
+    
+    const updateDimensions = () => {
+      if (boardRef.current) {
+        const rect = boardRef.current.getBoundingClientRect();
+        setBoardDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+    
+    // Initial update
+    updateDimensions();
+    
+    // Add resize listener
+    window.addEventListener('resize', updateDimensions);
+    
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, []);
 
   // Transform cursor positions between viewports
   const transformCursorPosition = (
@@ -100,6 +162,23 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
     return unsubscribe;
   }, [sessionId]);
 
+  // Effect to detect and update sticky note colors based on their column
+  useEffect(() => {
+    // Skip if board dimensions aren't available yet
+    if (boardDimensions.width === 0) return;
+    
+    // Check each sticky note's position and update its color if needed
+    Object.values(stickyNotes).forEach(note => {
+      const column = getNoteColumn(note.position);
+      if (column) {
+        // If the note color doesn't match the column color, update it
+        if (note.color !== column.color) {
+          updateStickyNoteColor(sessionId, note.id, column.color);
+        }
+      }
+    });
+  }, [stickyNotes, boardDimensions, sessionId]);
+
   useEffect(() => {
     // Create a cursor updater for the current user
     cursorUpdateRef.current = createCursorUpdater(sessionId, currentUser.id);
@@ -135,10 +214,14 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only enable panning when clicking directly on the sticky notes container
     // and not on any sticky notes themselves
-    if (e.button === 0 && e.target === boardRef.current) {
+    if (e.button === 0 && (e.target === boardRef.current || e.currentTarget.contains(e.target as Node))) {
+      // Skip panning if we clicked on a sticky note
+      if ((e.target as HTMLElement).closest('.sticky-note')) return;
+      
       e.preventDefault();
       setIsPanning(true);
       lastPanPosition.current = { x: e.clientX, y: e.clientY };
+      hasPannedRef.current = false;
     }
   };
 
@@ -146,6 +229,12 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
     if (isPanning) {
       const deltaX = e.clientX - lastPanPosition.current.x;
       const deltaY = e.clientY - lastPanPosition.current.y;
+      
+      // Check if the user has moved enough to consider it a panning action
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      if (distance > 5) {
+        hasPannedRef.current = true;
+      }
       
       setPan(prev => ({
         x: prev.x + deltaX,
@@ -156,13 +245,20 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
     }
   };
 
-  const handleMouseUp = () => {
-    setIsPanning(false);
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (isPanning) {
+      // If the mouse is released and there was no significant panning, consider it a click
+      if (!hasPannedRef.current) {
+        // Create a sticky note on single click without panning
+        handleAddNote(e);
+      }
+      
+      // Reset the panning state
+      setIsPanning(false);
+    }
   };
 
   const handleAddNote = async (e: React.MouseEvent) => {
-    if (!isAddingNote || isPanning) return;
-    
     const rect = boardRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -174,17 +270,20 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
     const whiteboardX = viewportX - pan.x;
     const whiteboardY = viewportY - pan.y;
 
+    // Determine which column the note is being added to
+    const column = getNoteColumn({ x: whiteboardX, y: whiteboardY });
+    
     const noteId = nanoid();
     const note = {
       id: noteId,
       content: '',
       authorId: currentUser.id,
       position: { x: whiteboardX, y: whiteboardY },
-      color: getRandomColor()
+      color: column ? column.color : getRandomColor(), // Use column color if available
+      columnId: column?.id
     };
     
     await addStickyNote(sessionId, note);
-    setIsAddingNote(false);
   };
 
   const getRandomColor = () => {
@@ -201,19 +300,7 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   return (
     <div className="relative w-full h-full">
       {/* Toolbar */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <button
-          onClick={() => setIsAddingNote(!isAddingNote)}
-          className={`p-2 rounded-lg flex items-center gap-2 transition-colors ${
-            isAddingNote 
-              ? 'bg-indigo-600 text-white' 
-              : 'bg-white text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Note</span>
-        </button>
-
+      <div className="absolute top-4 left-4 z-30 flex gap-2">
         <button
           onClick={() => setPan({ x: 0, y: 0 })}
           className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50"
@@ -225,18 +312,72 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
 
       {/* Whiteboard */}
       <div
-        onClick={handleAddNote}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative"
         style={{
-          cursor: isPanning ? 'grabbing' : isAddingNote ? 'crosshair' : 'default'
+          cursor: isPanning ? 'grabbing' : 'default'
         }}
       >
-        {/* Other users' cursors - rendered above everything */}
-        <div className="absolute inset-0 pointer-events-none">
+        {/* Content area that pans with the board */}
+        <div
+          ref={boardRef}
+          className="absolute inset-0"
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px)`,
+            transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+          }}
+        >
+          {/* Column backgrounds, headers, and vertical dividers */}
+          <div className="absolute inset-0 flex h-full">
+            {RETROSPECTIVE_COLUMNS.map((column, index) => (
+              <div
+                key={column.id}
+                className="h-full relative"
+                style={{ 
+                  width: `${column.position.width}%`
+                }}
+              >
+                {/* Column background */}
+                <div 
+                  className="absolute inset-0"
+                  style={{ 
+                    backgroundColor: `${column.color.replace('bg-', '')}30`  // 30% opacity
+                  }}
+                />
+                
+                {/* Column header */}
+                <div className="sticky top-0 h-14 flex items-center justify-center font-semibold text-gray-700 border-b border-gray-200 bg-white bg-opacity-90 backdrop-blur-sm z-10 shadow-sm">
+                  {column.title}
+                </div>
+                
+                {/* Vertical divider */}
+                {index !== 0 && (
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 w-0.5 bg-gray-300 z-10"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {/* Sticky Notes */}
+          {stickyNotesArray.map((note) => (
+            <StickyNoteComponent
+              key={note.id}
+              note={note}
+              sessionId={sessionId}
+              currentUser={currentUser}
+              isRevealed={isRevealed}
+              author={users[note.authorId]}
+            />
+          ))}
+        </div>
+        
+        {/* User cursors (always on top) */}
+        <div className="absolute inset-0 pointer-events-none z-30">
           {cursors.map(({ userId, user, position }) => (
             <div
               key={userId}
@@ -258,28 +399,6 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
                 {user.name}
               </span>
             </div>
-          ))}
-        </div>
-
-        {/* Sticky notes container */}
-        <div
-          ref={boardRef}
-          className="absolute inset-0"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px)`,
-            transition: isPanning ? 'none' : 'transform 0.1s ease-out'
-          }}
-        >
-          {/* Sticky Notes */}
-          {stickyNotesArray.map((note) => (
-            <StickyNoteComponent
-              key={note.id}
-              note={note}
-              sessionId={sessionId}
-              currentUser={currentUser}
-              isRevealed={isRevealed}
-              author={users[note.authorId]}
-            />
           ))}
         </div>
       </div>

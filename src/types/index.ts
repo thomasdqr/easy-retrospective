@@ -14,6 +14,17 @@ export interface StickyNote {
     y: number;
   };
   color: string;
+  columnId?: string;
+}
+
+export interface Column {
+  id: string;
+  title: string;
+  color: string;
+  position: {
+    x: number;
+    width: number;
+  };
 }
 
 export interface SessionBasicInfo {

@@ -279,14 +279,14 @@ export const toggleSessionReveal = async (
 };
 
 /**
- * Subscribe to all sticky notes
+ * Subscribe to sticky notes in a session
  */
 export const subscribeToStickyNotes = (
   sessionId: string,
   onStickyNotesUpdate: (stickyNotes: Record<string, StickyNote>) => void
 ) => {
   const path = `stickyNotes/${sessionId}`;
-  const notesRef = ref(realtimeDb, path);
+  const stickyNotesRef = ref(realtimeDb, path);
   
   // Re-use existing subscription if available
   if (activeRtSubscriptions[path]) {
@@ -305,15 +305,15 @@ export const subscribeToStickyNotes = (
   
   // Create new subscription
   console.log(`Creating new subscription for sticky notes in session ${sessionId}`);
-  activeRtSubscriptions[path] = notesRef;
+  activeRtSubscriptions[path] = stickyNotesRef;
   
-  onValue(notesRef, (snapshot) => {
+  onValue(stickyNotesRef, (snapshot) => {
     const data = snapshot.val() || {};
     onStickyNotesUpdate(data);
   });
   
   return () => {
-    off(notesRef);
+    off(stickyNotesRef);
     delete activeRtSubscriptions[path];
   };
 };
@@ -383,4 +383,16 @@ export const deleteStickyNote = async (
 ): Promise<void> => {
   const noteRef = ref(realtimeDb, `stickyNotes/${sessionId}/${noteId}`);
   await set(noteRef, null);
+};
+
+/**
+ * Update the color of a sticky note
+ */
+export const updateStickyNoteColor = async (
+  sessionId: string,
+  noteId: string,
+  color: string
+): Promise<void> => {
+  const noteColorRef = ref(realtimeDb, `stickyNotes/${sessionId}/${noteId}/color`);
+  await set(noteColorRef, color);
 }; 

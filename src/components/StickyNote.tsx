@@ -8,7 +8,8 @@ import {
   createNotePositionUpdater,
   setNoteMovingStatus,
   subscribeToNotesMoving,
-  subscribeToNotesPosition
+  subscribeToNotesPosition,
+  updateStickyNoteColor
 } from '../services/realtimeDbService';
 
 interface StickyNoteProps {
@@ -163,7 +164,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   return (
     <div
       ref={noteRef}
-      className={`absolute select-none ${note.color} rounded-lg shadow-lg p-4 w-64 ${
+      className={`absolute select-none sticky-note ${note.color} rounded-lg shadow-lg p-4 w-64 ${
         isBeingMovedBySomeoneElse ? 'cursor-not-allowed' : canMove ? 'cursor-move' : 'cursor-default'
       }`}
       style={{
