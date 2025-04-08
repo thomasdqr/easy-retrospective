@@ -100,8 +100,8 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
 
     const handleMouseMove = (e: MouseEvent) => {
       const newPosition = {
-        x: e.clientX - startX,
-        y: e.clientY - startY
+        x: (e.clientX - startX) / 1,
+        y: (e.clientY - startY) / 1
       };
       
       setPosition(newPosition);

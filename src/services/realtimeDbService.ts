@@ -5,13 +5,20 @@ import { StickyNote } from '../types';
 // Active subscriptions cache
 const activeRtSubscriptions: Record<string, DatabaseReference> = {};
 
+interface CursorData {
+  x: number;
+  y: number;
+  pan: { x: number; y: number };
+  lastUpdate: number;
+}
+
 /**
  * Subscribe to real-time cursors data
  * Returns an unsubscribe function
  */
 export const subscribeToCursors = (
   sessionId: string,
-  onCursorsUpdate: (cursors: Record<string, { x: number, y: number, lastUpdate: number }>) => void
+  onCursorsUpdate: (cursors: Record<string, CursorData>) => void
 ) => {
   const path = `cursors/${sessionId}`;
   const cursorsRef = ref(realtimeDb, path);
@@ -52,15 +59,11 @@ export const subscribeToCursors = (
  */
 export const createCursorUpdater = (sessionId: string, userId: string) => {
   let timeout: NodeJS.Timeout | null = null;
-  let lastCursorData: { x: number, y: number, lastUpdate: number } | null = null;
+  let lastCursorData: CursorData | null = null;
   
-  return (x: number, y: number) => {
+  return (cursorData: CursorData) => {
     // Store the latest data
-    lastCursorData = {
-      x,
-      y,
-      lastUpdate: Date.now()
-    };
+    lastCursorData = cursorData;
     
     if (timeout) return; // Skip if update is already pending
     
@@ -68,15 +71,18 @@ export const createCursorUpdater = (sessionId: string, userId: string) => {
     const updateCursor = async () => {
       if (!lastCursorData) return;
       
-      const cursorData = { ...lastCursorData };
+      const cursorDataToUpdate = { ...lastCursorData };
       const cursorRef = ref(realtimeDb, `cursors/${sessionId}/${userId}`);
-      await set(cursorRef, cursorData);
+      await set(cursorRef, cursorDataToUpdate);
       
       // Allow next update after timeout
       timeout = null;
       
       // If there's been a position change during the update, schedule another update
-      if (lastCursorData.x !== cursorData.x || lastCursorData.y !== cursorData.y) {
+      if (lastCursorData.x !== cursorDataToUpdate.x || 
+          lastCursorData.y !== cursorDataToUpdate.y ||
+          lastCursorData.pan.x !== cursorDataToUpdate.pan.x ||
+          lastCursorData.pan.y !== cursorDataToUpdate.pan.y) {
         setTimeout(updateCursor, 30); // 30ms throttle for snappier cursor updates
       }
     };
