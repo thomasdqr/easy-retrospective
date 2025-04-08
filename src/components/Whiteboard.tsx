@@ -234,21 +234,16 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
           cursor: isPanning ? 'grabbing' : isAddingNote ? 'crosshair' : 'default'
         }}
       >
-        <div
-          className="absolute top-0 left-0 w-full h-full"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px)`,
-            transition: isPanning ? 'none' : 'transform 0.1s ease-out'
-          }}
-        >
-          {/* Other users' cursors */}
+        {/* Other users' cursors - rendered above everything */}
+        <div className="absolute inset-0 pointer-events-none">
           {cursors.map(({ userId, user, position }) => (
             <div
               key={userId}
               className="absolute pointer-events-none"
               style={{
                 transform: `translate(${position.x}px, ${position.y}px)`,
-                transition: 'transform 0.2s ease-out'
+                transition: 'transform 0.2s ease-out',
+                zIndex: 1000
               }}
             >
               <img
@@ -263,7 +258,16 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
               </span>
             </div>
           ))}
+        </div>
 
+        {/* Sticky notes container */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px)`,
+            transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+          }}
+        >
           {/* Sticky Notes */}
           {stickyNotesArray.map((note) => (
             <StickyNoteComponent
