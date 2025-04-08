@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { MoveHorizontal } from 'lucide-react';
+import { Focus } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import { nanoid } from 'nanoid';
 import { 
@@ -42,7 +42,7 @@ const RETROSPECTIVE_COLUMNS: Column[] = [
   },
   {
     id: 'action-items',
-    title: '🔄 Action Items',
+    title: '💪 What can we do better?',
     color: 'bg-blue-200',
     position: { x: 66.66, width: 33.34 }
   }
@@ -62,12 +62,13 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
   const hasPannedRef = useRef<boolean>(false);
 
   // Get the column a sticky note belongs to based on its position
-  const getNoteColumn = (notePosition: { x: number; y: number }): Column | null => {
-    if (!boardRef.current) return null;
+  const getNoteColumn = (notePosition: { x: number; y: number } | undefined): Column | null => {
+    if (!boardRef.current || !notePosition) return null;
     
     const boardWidth = boardDimensions.width;
     
-    // Calculate the percentage across the board
+    // When determining column by click position, we need to adjust for the current
+    // board dimensions with the position in the viewport (not panned coordinates)
     const percentageAcross = (notePosition.x / boardWidth) * 100;
     
     // Find the column that contains this position
@@ -169,6 +170,9 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
     
     // Check each sticky note's position and update its color if needed
     Object.values(stickyNotes).forEach(note => {
+      // Skip invalid notes or those without position data
+      if (!note || !note.position) return;
+      
       const column = getNoteColumn(note.position);
       if (column) {
         // If the note color doesn't match the column color, update it
@@ -262,39 +266,26 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
     const rect = boardRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Calculate the position in the viewport
+    // Calculate the mouse position relative to the board container
     const viewportX = e.clientX - rect.left;
     const viewportY = e.clientY - rect.top;
 
-    // Convert viewport coordinates to whiteboard coordinates
-    const whiteboardX = viewportX - pan.x;
-    const whiteboardY = viewportY - pan.y;
-
     // Determine which column the note is being added to
-    const column = getNoteColumn({ x: whiteboardX, y: whiteboardY });
+    const column = getNoteColumn({ x: viewportX, y: viewportY });
     
     const noteId = nanoid();
     const note = {
       id: noteId,
       content: '',
       authorId: currentUser.id,
-      position: { x: whiteboardX, y: whiteboardY },
-      color: column ? column.color : getRandomColor(), // Use column color if available
-      columnId: column?.id
+      // Use viewport coordinates directly for sticky note position
+      position: { x: viewportX, y: viewportY },
+      color: column ? column.color : 'bg-yellow-200', // Default to yellow if no column
+      // Set to "other" category when outside of columns to avoid undefined error
+      columnId: column ? column.id : 'other'
     };
     
     await addStickyNote(sessionId, note);
-  };
-
-  const getRandomColor = () => {
-    const colors = [
-      'bg-yellow-200',
-      'bg-green-200',
-      'bg-blue-200',
-      'bg-pink-200',
-      'bg-purple-200'
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
   };
 
   return (
@@ -306,7 +297,7 @@ function Whiteboard({ sessionId, currentUser, users }: WhiteboardProps) {
           className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50"
           title="Reset View"
         >
-          <MoveHorizontal className="w-5 h-5" />
+          <Focus className="w-5 h-5" />
         </button>
       </div>
 
