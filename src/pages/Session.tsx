@@ -4,7 +4,7 @@ import { User } from '../types';
 import UserOnboarding from '../components/UserOnboarding';
 import UserList from '../components/UserList';
 import Whiteboard from '../components/Whiteboard';
-import { Eye, EyeOff } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
 import { subscribeToSessionRevealed, toggleSessionReveal } from '../services/realtimeDbService';
@@ -19,6 +19,7 @@ function Session() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -108,6 +109,19 @@ function Session() {
     await toggleSessionReveal(sessionId, newRevealedState);
   };
 
+  const handleCopyInviteLink = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(
+      () => {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      },
+      (err) => {
+        console.error('Could not copy text: ', err);
+      }
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -130,6 +144,24 @@ function Session() {
       <div className="mx-auto">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold text-gray-900">Retrospective Board</h1>
+          
+          {currentUser?.isCreator && (
+            <div className="flex items-center">
+              <div className="bg-white border border-gray-300 rounded-l-md px-3 py-2 flex-1 text-sm text-gray-700 truncate max-w-[200px]">
+                {window.location.href}
+              </div>
+              <button
+                onClick={handleCopyInviteLink}
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-r-md border border-l-0 border-gray-300 ${
+                  copySuccess ? 'bg-green-500 text-white' : 'bg-white hover:bg-gray-50 text-gray-700'
+                } transition-colors duration-300 shadow-sm`}
+                title="Copy invite link to clipboard"
+              >
+                <Copy className="w-4 h-4" />
+                {copySuccess ? 'Copied!' : 'Invite to Session'}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-4">
