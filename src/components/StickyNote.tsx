@@ -11,6 +11,16 @@ import {
   subscribeToNotesPosition,
 } from '../services/realtimeDbService';
 
+// Function to generate random characters
+const generateRandomCharacters = (length: number): string => {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+};
+
 interface StickyNoteProps {
   note: StickyNote;
   sessionId: string;
@@ -32,6 +42,20 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   const localPositionRef = useRef(note.position);
   const justReleasedRef = useRef(false);
   const justReleasedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const maskedContentRef = useRef<string>('');
+
+  const isAuthor = currentUser.id === note.authorId;
+  const isBeingMovedBySomeoneElse = notesMoving[note.id] && notesMoving[note.id] !== currentUser.id;
+  const canMove = !isBeingMovedBySomeoneElse;
+  const canEdit = isAuthor && !isBeingMovedBySomeoneElse;
+  const shouldShowContent = isRevealed || isAuthor;
+
+  // Generate masked content when isRevealed changes
+  useEffect(() => {
+    if (!shouldShowContent) {
+      maskedContentRef.current = generateRandomCharacters(content.length || 10);
+    }
+  }, [isRevealed, content.length]);
 
   // Setup the updaters when component mounts
   useEffect(() => {
@@ -189,12 +213,13 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
     await deleteStickyNote(sessionId, note.id);
   };
 
-  const isAuthor = currentUser.id === note.authorId;
-  const isBeingMovedBySomeoneElse = notesMoving[note.id] && notesMoving[note.id] !== currentUser.id;
-  // Allow any user to move any note, but only author can edit or delete
-  const canMove = !isBeingMovedBySomeoneElse;
-  const canEdit = isAuthor && !isBeingMovedBySomeoneElse;
-  const shouldShowContent = isRevealed || isAuthor;
+  // Get display content
+  const getDisplayContent = () => {
+    if (shouldShowContent) {
+      return content || (isAuthor ? 'Click to add text' : '');
+    }
+    return maskedContentRef.current;
+  };
 
   return (
     <div
@@ -247,9 +272,9 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
           onClick={() => canEdit && !isDragging && setIsEditing(true)}
           className={`min-h-[3em] p-1 rounded ${!shouldShowContent && 'blur-sm'} ${
             canEdit && !isDragging ? 'cursor-text hover:bg-black/5' : ''
-          }`}
+          } overflow-hidden break-words`}
         >
-          {content || (isAuthor ? 'Click to add text' : '')}
+          {getDisplayContent()}
         </div>
       )}
     </div>
