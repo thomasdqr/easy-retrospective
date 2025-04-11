@@ -193,14 +193,15 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   return (
     <div
       ref={noteRef}
-      className={`absolute select-none sticky-note ${note.color} rounded-lg shadow-lg p-4 w-64 ${
+      className={`absolute select-none sticky-note ${note.color} rounded-xl shadow-md hover:shadow-lg p-4 w-64 ${
         isBeingMovedBySomeoneElse ? 'cursor-not-allowed' : canMove ? 'cursor-move' : 'cursor-default'
-      }`}
+      } transition-all duration-200`}
       style={{
         transform: `translate(${position.x}px, ${position.y}px)`,
-        transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+        transition: isDragging ? 'none' : 'transform 0.1s ease-out, box-shadow 0.2s ease',
         zIndex: isDragging ? 10 : 1,
-        opacity: isBeingMovedBySomeoneElse ? 0.7 : 1
+        opacity: isBeingMovedBySomeoneElse ? 0.7 : 1,
+        border: '1px solid rgba(0,0,0,0.05)'
       }}
       onMouseDown={canMove ? handleMouseDown : undefined}
     >
@@ -209,9 +210,9 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
           <img
             src={author.avatar}
             alt={author.name}
-            className="w-6 h-6 rounded-full"
+            className="w-6 h-6 rounded-full border border-white shadow-sm"
           />
-          <span className="text-sm text-gray-600">
+          <span className="text-sm font-medium text-gray-700">
             {author.name}
             {isBeingMovedBySomeoneElse && ' (moving...)'}
           </span>
@@ -219,7 +220,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
         {isAuthor && !isBeingMovedBySomeoneElse && (
           <button
             onClick={handleDelete}
-            className="text-gray-400 hover:text-red-500 transition-colors"
+            className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -231,14 +232,14 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
           value={content}
           onChange={handleContentChange}
           onBlur={handleContentBlur}
-          className="w-full bg-transparent resize-none focus:outline-none"
+          className="w-full bg-transparent resize-none focus:outline-none p-1 rounded"
           rows={3}
           autoFocus
         />
       ) : (
         <div
           onClick={() => canEdit && !isDragging && setIsEditing(true)}
-          className={`min-h-[3em] ${!shouldShowContent && 'blur-sm'} ${
+          className={`min-h-[3em] p-1 rounded ${!shouldShowContent && 'blur-sm'} ${
             canEdit && !isDragging ? 'cursor-text hover:bg-black/5' : ''
           }`}
         >

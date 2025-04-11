@@ -138,6 +138,10 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     
     // Initial update
     updateDimensions();
+
+    // Automatically center the whiteboard when it's first loaded
+    setPan(calculateCenterPosition())
+
     
     // Add resize listener
     window.addEventListener('resize', updateDimensions);
@@ -146,16 +150,6 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       window.removeEventListener('resize', updateDimensions);
     };
   }, []);
-
-  // Automatically center the whiteboard when it's first loaded
-  useEffect(() => {
-    // Only center once and only after the board dimensions are available
-    if (!initialCenterAppliedRef.current && boardDimensions.width > 0) {
-      const centerPosition = calculateCenterPosition();
-      setPan(centerPosition);
-      initialCenterAppliedRef.current = true;
-    }
-  }, [boardDimensions]);
 
   // Transform cursor positions between viewports
   const transformCursorPosition = (
@@ -189,7 +183,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     const centerX = (containerRect.width - totalBoardWidth) / 2;
     
     // For vertical centering, just return to top since columns extend to full height
-    return { x: centerX, y: 0 };
+    return { x: centerX, y: 50 };
   };
 
   // Memoize sticky notes array to prevent unnecessary re-renders
@@ -445,45 +439,6 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
 
   return (
     <div className="relative w-full h-full flex flex-col">
-      {/* Toolbar - moved outside and above the whiteboard */}
-      <div className="py-2 px-4 flex gap-2 bg-gray-50 border-b border-gray-200 justify-between">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPan(calculateCenterPosition())}
-            className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm flex items-center gap-1"
-            title="Center View"
-          >
-            <Focus className="w-4 h-4" />
-            <span className="text-sm">Center</span>
-          </button>
-          
-          {currentUser.isCreator && (
-            <button
-              onClick={handleAddColumn}
-              className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm flex items-center gap-1"
-              title="Add Column"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-sm">Add Column</span>
-            </button>
-          )}
-        </div>
-        
-        {currentUser.isCreator && onToggleReveal && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">{isRevealed ? 'Visible Notes' : 'Hidden Notes'}</span>
-            <button
-              onClick={onToggleReveal}
-              className="p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm flex items-center gap-1"
-              title={isRevealed ? "Hide Notes" : "Show Notes"}
-            >
-              {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              <span className="text-sm">{isRevealed ? "Hide" : "Show"}</span>
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Whiteboard */}
       <div
         onMouseDown={handleMouseDown}
@@ -495,41 +450,113 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           cursor: isPanning ? 'grabbing' : 'default'
         }}
       >
+        {/* Floating Toolbar */}
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-3 transition-all duration-300 hover:shadow-xl">
+          <button
+            onClick={() => setPan(calculateCenterPosition())}
+            className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
+            title="Center View"
+          >
+            <Focus className="w-4 h-4" />
+            <span className="text-sm font-medium">Center</span>
+          </button>
+          
+          {currentUser.isCreator && (
+            <button
+              onClick={handleAddColumn}
+              className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
+              title="Add Column"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">Add Column</span>
+            </button>
+          )}
+          
+          {currentUser.isCreator && onToggleReveal && (
+            <>
+              <div className="h-8 w-px bg-gray-200 mx-1"></div>
+              <button
+                onClick={onToggleReveal}
+                className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
+                title={isRevealed ? "Hide Notes" : "Show Notes"}
+              >
+                {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                <span className="text-sm font-medium">{isRevealed ? "Hide" : "Show"}</span>
+              </button>
+            </>
+          )}
+        </div>
+
         {/* Content area that pans with the board */}
         <div
           ref={boardRef}
           className="absolute inset-0"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px)`,
-            transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+            transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+            height: 'auto',
+            minHeight: '3000px'
           }}
         >
           {/* Column backgrounds, headers, and vertical dividers */}
-          <div className="absolute inset-0 flex h-full" style={{ width: `${columnsArray.reduce((sum, col) => sum + col.position.width, 0)}px` }}>
+          <div className="absolute inset-0 flex h-auto" style={{ 
+            width: `${columnsArray.reduce((sum, col) => sum + col.position.width, 0)}px`,
+            minHeight: '100%'
+          }}>
             {columnsArray.map((column, index) => (
               <div
                 key={column.id}
                 className="h-full relative"
                 style={{ 
-                  width: `${column.position.width}px`
+                  width: `${column.position.width}px`,
+                  paddingTop: '20px', // Add some space at the top
+                  minHeight: '3000px', // Make columns very tall
+                  paddingLeft: index !== 0 ? '5px' : '0px' // Add subtle spacing between columns
                 }}
               >
                 {/* Column background */}
                 <div 
-                  className="absolute inset-0"
+                  className="absolute inset-0 transition-colors duration-200 overflow-hidden"
                   style={{ 
-                    backgroundColor: `${column.color.replace('bg-', '')}30`  // 30% opacity
+                    backgroundColor: column.color === 'bg-green-200' ? 'rgba(167, 243, 208, 0.5)' :
+                                     column.color === 'bg-red-200' ? 'rgba(254, 202, 202, 0.5)' :
+                                     column.color === 'bg-blue-200' ? 'rgba(191, 219, 254, 0.5)' :
+                                     column.color === 'bg-yellow-200' ? 'rgba(254, 240, 138, 0.5)' :
+                                     column.color === 'bg-purple-200' ? 'rgba(233, 213, 255, 0.5)' :
+                                     column.color === 'bg-pink-200' ? 'rgba(251, 207, 232, 0.5)' :
+                                     column.color === 'bg-indigo-200' ? 'rgba(199, 210, 254, 0.5)' :
+                                     column.color === 'bg-orange-200' ? 'rgba(254, 215, 170, 0.5)' :
+                                     column.color === 'bg-teal-200' ? 'rgba(153, 246, 228, 0.5)' :
+                                     'rgba(229, 231, 235, 0.5)', // Default gray if no match
+                    height: '100%',
+                    minHeight: 'inherit'
                   }}
                 />
                 
                 {/* Column header */}
-                <div className="sticky top-0 h-14 flex items-center justify-center font-semibold text-gray-700 border-b border-gray-200 bg-white bg-opacity-90 backdrop-blur-sm z-10 shadow-sm group">
+                <div className="sticky top-4 flex items-center justify-center font-semibold text-gray-700 z-10 shadow-sm group mx-3 mt-3 rounded-xl border transition-all duration-200 hover:shadow-md"
+                  style={{
+                    backgroundColor: 'white',
+                    borderColor: column.color === 'bg-green-200' ? 'rgba(167, 243, 208, 1)' :
+                                 column.color === 'bg-red-200' ? 'rgba(254, 202, 202, 1)' :
+                                 column.color === 'bg-blue-200' ? 'rgba(191, 219, 254, 1)' :
+                                 column.color === 'bg-yellow-200' ? 'rgba(254, 240, 138, 1)' :
+                                 column.color === 'bg-purple-200' ? 'rgba(233, 213, 255, 1)' :
+                                 column.color === 'bg-pink-200' ? 'rgba(251, 207, 232, 1)' :
+                                 column.color === 'bg-indigo-200' ? 'rgba(199, 210, 254, 1)' :
+                                 column.color === 'bg-orange-200' ? 'rgba(254, 215, 170, 1)' :
+                                 column.color === 'bg-teal-200' ? 'rgba(153, 246, 228, 1)' :
+                                 'rgba(229, 231, 235, 1)', // Default gray if no match
+                    height: editingColumn === column.id && showColorPicker ? 'auto' : '3.5rem',
+                    minHeight: '3.5rem'
+                  }}
+                >
                   {editingColumn === column.id ? (
-                    <div className="flex flex-col w-full px-4 gap-2">
+                    <div className="flex flex-col w-full px-4 gap-2 py-2">
                       <div className="flex items-center gap-2 w-full">
                         <input
                           type="text"
-                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm bg-white"
                           value={editColumnTitle}
                           onChange={(e) => setEditColumnTitle(e.target.value)}
                           autoFocus
@@ -537,19 +564,19 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => setShowColorPicker(!showColorPicker)}
-                            className={`w-6 h-6 rounded ${editColumnColor} border border-gray-300`}
+                            className={`w-6 h-6 rounded-full ${editColumnColor} border border-gray-300`}
                             title="Change Color"
                           />
                           <button 
                             onClick={handleSaveColumnEdit} 
-                            className="text-green-600 hover:bg-green-50 p-1 rounded"
+                            className="text-green-600 hover:bg-green-50 p-1 rounded-full"
                             title="Save"
                           >
                             <Check className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={handleCancelColumnEdit} 
-                            className="text-red-600 hover:bg-red-50 p-1 rounded"
+                            className="text-red-600 hover:bg-red-50 p-1 rounded-full"
                             title="Cancel"
                           >
                             <X className="w-4 h-4" />
@@ -558,11 +585,11 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                       </div>
                       
                       {showColorPicker && (
-                        <div className="flex flex-wrap gap-1 p-1 bg-white border border-gray-200 rounded shadow-md">
+                        <div className="flex flex-wrap gap-1 p-1 bg-white border border-gray-200 rounded-lg shadow-md">
                           {AVAILABLE_COLORS.map(color => (
                             <button
                               key={color}
-                              className={`w-5 h-5 rounded-full ${color} ${editColumnColor === color ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}
+                              className={`w-5 h-5 rounded-full ${color} ${editColumnColor === color ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
                               onClick={() => setEditColumnColor(color)}
                             />
                           ))}
@@ -570,38 +597,36 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span>{column.title}</span>
+                    <div className="flex items-center gap-2 py-2 px-4 w-full justify-between">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <div 
+                          className={`min-w-[0.75rem] w-3 h-3 rounded-full ${column.color} ring-1 ring-white`}
+                        />
+                        <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">{column.title}</span>
+                      </div>
                       
                       {currentUser.isCreator && (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 hover:opacity-100">
+                        <div className="flex items-center gap-1 ml-2">
                           <button 
                             onClick={() => handleEditColumn(column)} 
-                            className="text-gray-400 hover:text-gray-600 p-1"
+                            className="text-gray-600 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100"
                             title="Edit Column"
                           >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button 
                             onClick={() => handleDeleteColumn(column.id)} 
-                            className="text-gray-400 hover:text-red-600 p-1"
+                            className="text-gray-600 hover:text-red-600 p-1 rounded-full hover:bg-gray-100"
                             title="Delete Column"
                             disabled={Object.keys(columns).length <= 1}
                           >
-                            <Trash className="w-3 h-3" />
+                            <Trash className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-                
-                {/* Vertical divider */}
-                {index !== 0 && (
-                  <div 
-                    className="absolute left-0 top-0 bottom-0 w-0.5 bg-gray-300 z-10"
-                  />
-                )}
               </div>
             ))}
           </div>
