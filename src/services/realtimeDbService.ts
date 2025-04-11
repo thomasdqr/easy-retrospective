@@ -12,6 +12,32 @@ interface CursorData {
   lastUpdate: number;
 }
 
+interface IcebreakerStatement {
+  text: string;
+  isLie: boolean;
+  revealed: boolean;
+}
+
+interface IcebreakerPlayerState {
+  statements: {
+    "0": IcebreakerStatement;
+    "1": IcebreakerStatement;
+    "2": IcebreakerStatement;
+  };
+  hasSubmitted: boolean;
+  votes: Record<string, number>; // userId -> statementIndex voted as lie
+  score?: number;
+  statementOrder?: number[]; // Order of statements for this player (shuffled)
+}
+
+interface IcebreakerState {
+  users: Record<string, IcebreakerPlayerState>;
+  activeUser: string | null;
+  revealed: boolean;
+  completed?: boolean;
+  finalLeaderboard?: boolean;
+}
+
 /**
  * Subscribe to real-time cursors data
  * Returns an unsubscribe function
@@ -477,4 +503,73 @@ export const deleteColumn = async (
 ): Promise<void> => {
   const columnRef = ref(realtimeDb, `columns/${sessionId}/${columnId}`);
   await set(columnRef, null);
+};
+
+/**
+ * Subscribe to notes editing status
+ * This tracks which notes are being edited in real-time
+ */
+export const subscribeToNotesEditing = (
+  sessionId: string,
+  onNotesEditingUpdate: (notesEditing: Record<string, string | null>) => void
+) => {
+  const path = `notesEditing/${sessionId}`;
+  const notesEditingRef = ref(realtimeDb, path);
+  
+  // Re-use existing subscription if available
+  if (activeRtSubscriptions[path]) {
+    console.log('Using existing notes editing subscription');
+    const existingRef = activeRtSubscriptions[path];
+    onValue(existingRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      onNotesEditingUpdate(data);
+    });
+    
+    return () => {
+      off(existingRef);
+      delete activeRtSubscriptions[path];
+    };
+  }
+  
+  // Create new subscription
+  console.log(`Creating new subscription for notes editing in session ${sessionId}`);
+  activeRtSubscriptions[path] = notesEditingRef;
+  
+  onValue(notesEditingRef, (snapshot) => {
+    const data = snapshot.val() || {};
+    onNotesEditingUpdate(data);
+  });
+  
+  return () => {
+    off(notesEditingRef);
+    delete activeRtSubscriptions[path];
+  };
+};
+
+/**
+ * Set note editing status
+ */
+export const setNoteEditingStatus = async (
+  sessionId: string,
+  noteId: string,
+  userId: string | null
+): Promise<void> => {
+  const noteEditingRef = ref(realtimeDb, `notesEditing/${sessionId}/${noteId}`);
+  await set(noteEditingRef, userId);
+};
+
+// Icebreaker state functions
+export const updateIcebreakerState = async (sessionId: string, state: IcebreakerState) => {
+  const dbRef = ref(realtimeDb, `sessions/${sessionId}/icebreaker`);
+  await set(dbRef, state);
+};
+
+export const subscribeToIcebreakerState = (sessionId: string, callback: (state: IcebreakerState) => void) => {
+  const dbRef = ref(realtimeDb, `sessions/${sessionId}/icebreaker`);
+  
+  const unsubscribe = onValue(dbRef, (snapshot) => {
+    callback(snapshot.val());
+  });
+
+  return unsubscribe;
 }; 

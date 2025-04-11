@@ -9,6 +9,8 @@ import {
   setNoteMovingStatus,
   subscribeToNotesMoving,
   subscribeToNotesPosition,
+  subscribeToNotesEditing,
+  setNoteEditingStatus,
 } from '../services/realtimeDbService';
 
 // Function to generate random characters
@@ -36,6 +38,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   const [content, setContent] = useState(note.content);
   const [notesMoving, setNotesMoving] = useState<Record<string, string | null>>({});
   const [notesPositions, setNotesPositions] = useState<Record<string, {x: number, y: number}>>({});
+  const [notesEditing, setNotesEditing] = useState<Record<string, string | null>>({});
   const noteRef = useRef<HTMLDivElement>(null);
   const contentUpdaterRef = useRef<ReturnType<typeof createNoteContentUpdater>>();
   const positionUpdaterRef = useRef<ReturnType<typeof createNotePositionUpdater>>();
@@ -46,8 +49,9 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
 
   const isAuthor = currentUser.id === note.authorId;
   const isBeingMovedBySomeoneElse = notesMoving[note.id] && notesMoving[note.id] !== currentUser.id;
-  const canMove = !isBeingMovedBySomeoneElse;
-  const canEdit = isAuthor && !isBeingMovedBySomeoneElse;
+  const isBeingEditedBySomeoneElse = notesEditing[note.id] && notesEditing[note.id] !== currentUser.id;
+  const canMove = !isBeingMovedBySomeoneElse && !isEditing && !isBeingEditedBySomeoneElse;
+  const canEdit = isAuthor && !isBeingMovedBySomeoneElse && !isBeingEditedBySomeoneElse;
   const shouldShowContent = isRevealed || isAuthor;
 
   // Generate masked content when isRevealed changes
@@ -76,6 +80,15 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   useEffect(() => {
     const unsubscribe = subscribeToNotesPosition(sessionId, (positionsData) => {
       setNotesPositions(positionsData);
+    });
+    
+    return unsubscribe;
+  }, [sessionId]);
+
+  // Subscribe to real-time notes editing status
+  useEffect(() => {
+    const unsubscribe = subscribeToNotesEditing(sessionId, (notesEditingData) => {
+      setNotesEditing(notesEditingData);
     });
     
     return unsubscribe;
@@ -205,8 +218,16 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
     }
   };
 
-  const handleContentBlur = () => {
+  const handleContentBlur = async () => {
     setIsEditing(false);
+    await setNoteEditingStatus(sessionId, note.id, null);
+  };
+
+  const handleEditStart = async () => {
+    if (canEdit) {
+      setIsEditing(true);
+      await setNoteEditingStatus(sessionId, note.id, currentUser.id);
+    }
   };
 
   const handleDelete = async () => {
@@ -231,7 +252,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
         transform: `translate(${position.x}px, ${position.y}px)`,
         transition: isDragging ? 'none' : 'transform 0.1s ease-out, box-shadow 0.2s ease',
         zIndex: isDragging ? 10 : 1,
-        opacity: isBeingMovedBySomeoneElse ? 0.7 : 1,
+        opacity: isBeingMovedBySomeoneElse || isBeingEditedBySomeoneElse ? 0.7 : 1,
         border: '1px solid rgba(0,0,0,0.05)'
       }}
       onMouseDown={canMove ? handleMouseDown : undefined}
@@ -246,9 +267,10 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
           <span className="text-sm font-medium text-gray-700">
             {author.name}
             {isBeingMovedBySomeoneElse && ' (moving...)'}
+            {isBeingEditedBySomeoneElse && ' (editing...)'}
           </span>
         </div>
-        {isAuthor && !isBeingMovedBySomeoneElse && (
+        {isAuthor && !isBeingMovedBySomeoneElse && !isBeingEditedBySomeoneElse && (
           <button
             onClick={handleDelete}
             className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
@@ -269,7 +291,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
         />
       ) : (
         <div
-          onClick={() => canEdit && !isDragging && setIsEditing(true)}
+          onClick={handleEditStart}
           className={`min-h-[3em] p-1 rounded ${!shouldShowContent && 'blur-sm'} ${
             canEdit && !isDragging ? 'cursor-text hover:bg-black/5' : ''
           } overflow-hidden break-words`}

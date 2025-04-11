@@ -4,6 +4,7 @@ import { User } from '../types';
 import UserOnboarding from '../components/UserOnboarding';
 import UserList from '../components/UserList';
 import Whiteboard from '../components/Whiteboard';
+import Icebreaker from '../components/Icebreaker';
 import { Copy, EyeOff } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
@@ -20,6 +21,7 @@ function Session() {
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [icebreakerCompleted, setIcebreakerCompleted] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -136,6 +138,46 @@ function Session() {
         onComplete={handleUserComplete}
         isCreator={sessionBasicInfo ? Object.keys(sessionBasicInfo.users || {}).length === 0 : false}
       />
+    );
+  }
+
+  if (!icebreakerCompleted && sessionBasicInfo && sessionId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
+          <div className="flex justify-between items-center mx-1">
+            <h1 className="text-2xl font-bold text-gray-900">Icebreaker</h1>
+            {currentUser?.isCreator && (
+              <div className="flex items-center">
+                <div className="bg-white border border-gray-300 rounded-l-md px-3 py-2 flex-1 text-sm text-gray-700 truncate max-w-[200px]">
+                  {window.location.href}
+                </div>
+                <button
+                  onClick={handleCopyInviteLink}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-r-md border border-l-0 border-gray-300 ${
+                    copySuccess ? 'bg-green-500 text-white' : 'bg-white hover:bg-gray-50 text-gray-700'
+                  } transition-colors duration-300 shadow-sm`}
+                  title="Copy invite link to clipboard"
+                >
+                  <Copy className="w-4 h-4" />
+                  {copySuccess ? 'Copied!' : 'Invite to Session'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Icebreaker
+          sessionId={sessionId}
+          currentUser={currentUser}
+          users={sessionBasicInfo.users}
+          onComplete={() => setIcebreakerCompleted(true)}
+        />
+
+        <div className="fixed bottom-4 right-4 z-50">
+          <UserList users={sessionBasicInfo.users || {}} />
+        </div>
+      </div>
     );
   }
 
