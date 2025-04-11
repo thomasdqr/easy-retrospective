@@ -144,7 +144,7 @@ function Session() {
   if (!icebreakerCompleted && sessionBasicInfo && sessionId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4">
           <div className="flex justify-between items-center mx-1">
             <h1 className="text-2xl font-bold text-gray-900">Icebreaker</h1>
             {currentUser?.isCreator && (
