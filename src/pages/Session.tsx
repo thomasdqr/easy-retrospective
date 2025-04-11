@@ -4,7 +4,7 @@ import { User } from '../types';
 import UserOnboarding from '../components/UserOnboarding';
 import UserList from '../components/UserList';
 import Whiteboard from '../components/Whiteboard';
-import { Copy } from 'lucide-react';
+import { Copy, EyeOff } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
 import { subscribeToSessionRevealed, toggleSessionReveal } from '../services/realtimeDbService';
@@ -144,6 +144,15 @@ function Session() {
       <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
         <div className="flex justify-between items-center mx-1">
           <h1 className="text-2xl font-bold text-gray-900">Retrospective Board</h1>
+          
+          <div className="absolute left-1/2 -translate-x-1/2">
+            {!isRevealed && (
+              <div className="flex items-center gap-2 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                <EyeOff className="w-4 h-4" />
+                <span>Notes are hidden</span>
+              </div>
+            )}
+          </div>
           
           {currentUser?.isCreator && (
             <div className="flex items-center">
