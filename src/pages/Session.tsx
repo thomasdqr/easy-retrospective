@@ -140,9 +140,9 @@ function Session() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100 p-4">
-      <div className="mx-auto">
-        <div className="flex justify-between items-center mb-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
+        <div className="flex justify-between items-center mx-1">
           <h1 className="text-2xl font-bold text-gray-900">Retrospective Board</h1>
           
           {currentUser?.isCreator && (
@@ -163,26 +163,23 @@ function Session() {
             </div>
           )}
         </div>
+      </div>
 
-        <div className="flex gap-4">
-          {/* Main whiteboard area */}
-          <div className="flex-1 bg-white rounded-lg shadow-lg min-h-[calc(100vh-85px)]">
-            {sessionBasicInfo && sessionId && (
-              <Whiteboard
-                sessionId={sessionId}
-                currentUser={currentUser}
-                users={sessionBasicInfo.users}
-                isRevealed={isRevealed}
-                onToggleReveal={currentUser.isCreator ? handleToggleReveal : undefined}
-              />
-            )}
-          </div>
-          
-          {/* User list sidebar */}
-          <div className="fixed bottom-8 right-8 z-50">
-            <UserList users={sessionBasicInfo?.users || {}} />
-          </div>
-        </div>
+      <div className="h-screen">
+        {sessionBasicInfo && sessionId && (
+          <Whiteboard
+            sessionId={sessionId}
+            currentUser={currentUser}
+            users={sessionBasicInfo.users}
+            isRevealed={isRevealed}
+            onToggleReveal={currentUser.isCreator ? handleToggleReveal : undefined}
+          />
+        )}
+      </div>
+      
+      {/* User list sidebar */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <UserList users={sessionBasicInfo?.users || {}} />
       </div>
     </div>
   );

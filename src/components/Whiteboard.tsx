@@ -32,7 +32,7 @@ interface CursorData {
   lastUpdate: number;
 }
 
-const COLUMN_WIDTH = 400;
+const COLUMN_WIDTH = 350;
 
 // Define default retrospective columns
 const DEFAULT_RETROSPECTIVE_COLUMNS: Column[] = [
@@ -192,7 +192,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     const centerX = (containerRect.width - totalBoardWidth) / 2;
     
     // For vertical centering, just return to top since columns extend to full height
-    return { x: centerX, y: 0 };
+    return { x: centerX, y: 60 };
   };
 
   // Memoize sticky notes array to prevent unnecessary re-renders
