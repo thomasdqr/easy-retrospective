@@ -139,10 +139,6 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     // Initial update
     updateDimensions();
 
-    // Automatically center the whiteboard when it's first loaded
-    setPan(calculateCenterPosition())
-
-    
     // Add resize listener
     window.addEventListener('resize', updateDimensions);
     
@@ -150,6 +146,18 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       window.removeEventListener('resize', updateDimensions);
     };
   }, []);
+
+  // Separate effect to handle initial centering after everything is loaded
+  useEffect(() => {
+    // Only center if we have columns and board dimensions
+    if (Object.keys(columns).length > 0 && boardDimensions.width > 0) {
+      // Small delay to ensure DOM is fully rendered
+      const timer = setTimeout(() => {
+        setPan(calculateCenterPosition());
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [columns, boardDimensions.width]);
 
   // Transform cursor positions between viewports
   const transformCursorPosition = (
