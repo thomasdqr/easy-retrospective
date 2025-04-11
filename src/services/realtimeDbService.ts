@@ -151,17 +151,11 @@ export const setNoteMovingStatus = async (
  * Update note position while moving with throttling
  */
 export const createNotePositionUpdater = (sessionId: string, noteId: string) => {
-  let timeout: NodeJS.Timeout | null = null;
   let lastPosition: { x: number, y: number } | null = null;
-  let lastUpdateTime = 0;
   
   return (x: number, y: number) => {
     // Store the last position to use when drag ends
     lastPosition = { x, y };
-    
-    const now = Date.now();
-    // Reduce throttling threshold from 16ms to 8ms to send more frequent updates
-    if (timeout || now - lastUpdateTime < 8) return; // ~120fps instead of 60fps
     
     const updatePosition = async () => {
       if (!lastPosition) return;
@@ -171,23 +165,13 @@ export const createNotePositionUpdater = (sessionId: string, noteId: string) => 
       
       try {
         await set(positionRef, positionToUpdate);
-        lastUpdateTime = Date.now();
       } catch (error) {
         console.error("Error updating note position:", error);
-      } finally {
-        timeout = null;
-        
-        // If position changed during update, schedule another update immediately
-        if (lastPosition && (lastPosition.x !== positionToUpdate.x || lastPosition.y !== positionToUpdate.y)) {
-          setTimeout(updatePosition, 0); // Schedule immediately instead of waiting
-        }
       }
     };
     
-    // Start the update cycle if not already running
-    if (!timeout) {
-      timeout = setTimeout(updatePosition, 0);
-    }
+    // Use requestAnimationFrame to batch updates with the browser's render cycle
+    requestAnimationFrame(updatePosition);
   };
 };
 

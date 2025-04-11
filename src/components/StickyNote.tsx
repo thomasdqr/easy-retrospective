@@ -67,8 +67,11 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
       // 2. We're not currently dragging ourselves
       // 3. We didn't just release the note (to prevent position jitter)
       if (isBeingMovedBySomeoneElse || (!isDragging && !justReleasedRef.current)) {
-        setPosition(notesPositions[note.id]);
-        localPositionRef.current = notesPositions[note.id];
+        // Use requestAnimationFrame for smoother position updates
+        requestAnimationFrame(() => {
+          setPosition(notesPositions[note.id]);
+          localPositionRef.current = notesPositions[note.id];
+        });
       }
     }
   }, [notesPositions, note.id, isDragging, notesMoving, currentUser.id]);
@@ -124,10 +127,13 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
         y: originalY + deltaY
       };
       
-      setPosition(newPosition);
-      localPositionRef.current = newPosition;
+      // Use requestAnimationFrame for smoother position updates
+      requestAnimationFrame(() => {
+        setPosition(newPosition);
+        localPositionRef.current = newPosition;
+      });
       
-      // Update position in Realtime DB in real-time (throttled)
+      // Update position in Realtime DB in real-time
       if (positionUpdaterRef.current) {
         positionUpdaterRef.current(newPosition.x, newPosition.y);
       }
