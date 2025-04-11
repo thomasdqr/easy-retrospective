@@ -32,25 +32,27 @@ interface CursorData {
   lastUpdate: number;
 }
 
+const COLUMN_WIDTH = 400;
+
 // Define default retrospective columns
 const DEFAULT_RETROSPECTIVE_COLUMNS: Column[] = [
   {
     id: 'went-well',
     title: '✅ What Went Well',
     color: 'bg-green-200',
-    position: { x: 0, width: 350 }
+    position: { x: 0, width: COLUMN_WIDTH }
   },
   {
     id: 'needs-improvement',
     title: '❌ What Needs Improvement',
     color: 'bg-red-200',
-    position: { x: 350, width: 350 }
+    position: { x: COLUMN_WIDTH, width: COLUMN_WIDTH }
   },
   {
     id: 'action-items',
     title: '💪 What can we do better?',
     color: 'bg-blue-200',
-    position: { x: 700, width: 350 }
+    position: { x: COLUMN_WIDTH * 2, width: COLUMN_WIDTH }
   }
 ];
 
@@ -83,7 +85,6 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const lastPanPosition = useRef({ x: 0, y: 0 });
   const [boardDimensions, setBoardDimensions] = useState({ width: 0, height: 0 });
   const hasPannedRef = useRef<boolean>(false);
-  const initialCenterAppliedRef = useRef<boolean>(false);
 
   // Memoized array of columns sorted by x position
   const columnsArray = useMemo(() => {
@@ -191,7 +192,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     const centerX = (containerRect.width - totalBoardWidth) / 2;
     
     // For vertical centering, just return to top since columns extend to full height
-    return { x: centerX, y: 50 };
+    return { x: centerX, y: 0 };
   };
 
   // Memoize sticky notes array to prevent unnecessary re-renders
@@ -385,7 +386,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       id: nanoid(),
       title: 'New Column',
       color: AVAILABLE_COLORS[Math.floor(Math.random() * AVAILABLE_COLORS.length)],
-      position: { x: newX, width: 350 }
+      position: { x: newX, width: COLUMN_WIDTH }
     };
     
     await addColumn(sessionId, newColumn);
@@ -459,7 +460,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         }}
       >
         {/* Floating Toolbar */}
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-3 transition-all duration-300 hover:shadow-xl">
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-3 transition-all duration-300 hover:shadow-xl">
           <button
             onClick={() => setPan(calculateCenterPosition())}
             className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"

@@ -13,9 +13,9 @@ function UserList({ users }: UserListProps) {
   }, [users]);
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4 w-64">
+    <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 w-64 border border-gray-100">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Participants</h3>
-      <div className="space-y-3">
+      <div className="space-y-3 max-h-[50vh] overflow-y-auto">
         {sortedUsers.map((user) => (
           <div key={user.id} className="flex items-center gap-3">
             <img

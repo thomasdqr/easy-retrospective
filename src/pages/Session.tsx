@@ -179,7 +179,9 @@ function Session() {
           </div>
           
           {/* User list sidebar */}
-          <UserList users={sessionBasicInfo?.users || {}} />
+          <div className="fixed bottom-8 right-8 z-50">
+            <UserList users={sessionBasicInfo?.users || {}} />
+          </div>
         </div>
       </div>
     </div>
