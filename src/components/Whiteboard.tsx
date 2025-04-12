@@ -123,10 +123,16 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     // Use absolute position instead of percentage to determine column
     const absoluteX = notePosition.x;
     
+    // Width of a sticky note matches the w-64 class in StickyNote.tsx
+    const stickyNoteWidth = 256; // 16rem or 256px (w-64 in Tailwind)
+    
+    // Calculate the center position of the sticky note
+    const centerX = absoluteX + (stickyNoteWidth / 2);
+    
     // Find the column that contains this position based on position data
     return columnsArray.find(column => 
-      absoluteX >= column.position.x && 
-      absoluteX < (column.position.x + column.position.width)
+      centerX >= column.position.x && 
+      centerX < (column.position.x + column.position.width)
     ) || null;
   };
   
@@ -374,8 +380,14 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     const adjustedX = mouseX - pan.x;
     const adjustedY = mouseY - pan.y;
     
-    // Determine which column the note belongs to
-    const column = getNoteColumn({ x: adjustedX, y: adjustedY });
+    // Sticky note width (should match the value in getNoteColumn)
+    const stickyNoteWidth = 256; // 16rem or 256px (w-64 in Tailwind)
+    
+    // Determine which column the note belongs to using center position
+    const column = getNoteColumn({ 
+      x: adjustedX - (stickyNoteWidth / 2), // Offset X so click position is center of note
+      y: adjustedY 
+    });
     
     const noteId = nanoid();
     const note: StickyNote = {
@@ -383,7 +395,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       content: '',
       authorId: currentUser.id,
       position: {
-        x: adjustedX,
+        x: adjustedX - (stickyNoteWidth / 2), // Offset X so click position is center of note
         y: adjustedY
       },
       color: 'bg-yellow-100',
