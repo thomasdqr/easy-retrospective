@@ -754,7 +754,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
             title="Center View"
           >
             <Focus className="w-4 h-4" />
-            <span className="text-sm font-medium">Center</span>
+            <span className="text-sm font-medium whitespace-nowrap">Center</span>
           </button>
           
           {/* Drawing mode toggle button - always visible regardless of voting phase */}
@@ -764,12 +764,12 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
             title={isDrawingMode ? "Exit Drawing Mode" : "Draw on Whiteboard"}
           >
             <PencilLine className="w-4 h-4" />
-            <span className="text-sm font-medium">{isDrawingMode ? "Drawing" : "Draw"}</span>
+            <span className="text-sm font-medium whitespace-nowrap">{isDrawingMode ? "Exit Drawing" : "Draw"}</span>
           </button>
           
           {/* Drawing options - only show when in drawing mode */}
           {isDrawingMode && (
-            <>
+            <div className="h-full flex items-center gap-2">
               <div className="flex gap-2 items-center">
                 {DRAWING_COLORS.map(color => (
                   <button
@@ -794,7 +794,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
               <select 
                 value={drawingWidth}
                 onChange={(e) => setDrawingWidth(Number(e.target.value))}
-                className="p-1 rounded bg-gray-50 text-xs"
+                className="p-1 rounded bg-gray-50 text-xs h-8"
                 title="Line Width"
               >
                 <option value="1">Thin</option>
@@ -809,52 +809,57 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   title="Clear All Drawings"
                 >
                   <Eraser className="w-4 h-4" />
-                  <span className="text-sm font-medium">Clear</span>
+                  <span className="text-sm font-medium whitespace-nowrap">Clear</span>
                 </button>
               )}
-            </>
-          )}
-          
-          {currentUser.isCreator && !isVotingPhase && (
-            <button
-              onClick={handleAddColumn}
-              className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
-              title="Add Column"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-sm font-medium">Add Column</span>
-            </button>
-          )}
-          
-          {currentUser.isCreator && onToggleReveal && (
-            <>
-              <div className="h-8 w-px bg-gray-200 mx-1"></div>
-              <button
-                onClick={onToggleReveal}
-                className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
-                title={isRevealed ? "Hide Notes" : "Show Notes"}
-              >
-                {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                <span className="text-sm font-medium">{isRevealed ? "Hide" : "Show"}</span>
-              </button>
-              
-              <div className="h-8 w-px bg-gray-200 mx-1"></div>
-              <button
-                onClick={handleToggleVotingPhase}
-                className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center gap-1.5 transition-colors`}
-                title={isVotingPhase ? "End Voting" : "Start Voting"}
-              >
-                <ThumbsUp className="w-4 h-4" />
-                <span className="text-sm font-medium">{isVotingPhase ? "End Voting" : "Start Voting"}</span>
-              </button>
-            </>
-          )}
-          
-          {!currentUser.isCreator && isVotingPhase && (
-            <div className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium">
-              <ThumbsUp className="w-4 h-4" />
-              <span>Voting in progress</span>
             </div>
+          )}
+          
+          {/* Only show these buttons when NOT in drawing mode */}
+          {!isDrawingMode && (
+            <>
+              {currentUser.isCreator && !isVotingPhase && (
+                <button
+                  onClick={handleAddColumn}
+                  className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
+                  title="Add Column"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="text-sm font-medium whitespace-nowrap">Add Column</span>
+                </button>
+              )}
+              
+              {currentUser.isCreator && onToggleReveal && (
+                <>
+                  <div className="h-8 w-px bg-gray-200 mx-1"></div>
+                  <button
+                    onClick={onToggleReveal}
+                    className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
+                    title={isRevealed ? "Hide Notes" : "Show Notes"}
+                  >
+                    {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    <span className="text-sm font-medium whitespace-nowrap">{isRevealed ? "Hide" : "Show"}</span>
+                  </button>
+                  
+                  <div className="h-8 w-px bg-gray-200 mx-1"></div>
+                  <button
+                    onClick={handleToggleVotingPhase}
+                    className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center gap-1.5 transition-colors`}
+                    title={isVotingPhase ? "End Voting" : "Start Voting"}
+                  >
+                    <ThumbsUp className="w-4 h-4" />
+                    <span className="text-sm font-medium whitespace-nowrap">{isVotingPhase ? "End Voting" : "Start Voting"}</span>
+                  </button>
+                </>
+              )}
+              
+              {!currentUser.isCreator && isVotingPhase && (
+                <div className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap">
+                  <ThumbsUp className="w-4 h-4" />
+                  <span>Voting in progress</span>
+                </div>
+              )}
+            </>
           )}
         </div>
 
