@@ -260,6 +260,11 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         if (note.color !== column.color) {
           updateStickyNoteColor(sessionId, note.id, column.color);
         }
+      } else {
+        // Note is outside any column, make it yellow if it's not already
+        if (note.color !== 'bg-yellow-100') {
+          updateStickyNoteColor(sessionId, note.id, 'bg-yellow-100');
+        }
       }
     });
   }, [stickyNotes, boardDimensions, sessionId, columnsArray]);
@@ -398,8 +403,8 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         x: adjustedX - (stickyNoteWidth / 2), // Offset X so click position is center of note
         y: adjustedY
       },
-      color: 'bg-yellow-100',
-      columnId: column?.id
+      color: column ? column.color : 'bg-yellow-100',
+      columnId: column ? column.id : undefined
     };
     
     await addStickyNote(sessionId, note);
