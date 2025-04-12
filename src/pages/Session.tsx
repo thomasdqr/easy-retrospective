@@ -5,11 +5,15 @@ import UserOnboarding from '../components/UserOnboarding';
 import UserList from '../components/UserList';
 import Whiteboard from '../components/Whiteboard';
 import Icebreaker from '../components/Icebreaker';
+import Timer from '../components/Timer';
 import { Copy, EyeOff } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
-import { subscribeToSessionRevealed, toggleSessionReveal } from '../services/realtimeDbService';
+import { subscribeToSessionRevealed, toggleSessionReveal, subscribeToIcebreakerState } from '../services/realtimeDbService';
 import { USER_SESSION_KEY } from '../constants';
+
+// Key for storing retrospective started status in localStorage
+const RETROSPECTIVE_STARTED_KEY = 'retrospective_started_';
 
 function Session() {
   const { sessionId } = useParams();
@@ -20,6 +24,7 @@ function Session() {
   const [loading, setLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
   const [icebreakerCompleted, setIcebreakerCompleted] = useState(false);
+  const [retrospectiveStarted, setRetrospectiveStarted] = useState(false);
 
   useEffect(() => {
     if (!sessionId) {
@@ -40,6 +45,14 @@ function Session() {
         console.error("Error parsing stored session:", error);
         localStorage.removeItem(USER_SESSION_KEY);
       }
+    }
+
+    // Check if retrospective has already been started for this session
+    const retrospectiveStartedKey = `${RETROSPECTIVE_STARTED_KEY}${sessionId}`;
+    const hasRetrospectiveStarted = localStorage.getItem(retrospectiveStartedKey) === 'true';
+    if (hasRetrospectiveStarted) {
+      setIcebreakerCompleted(true);
+      setRetrospectiveStarted(true);
     }
 
     // Subscribe to session basic info updates
@@ -69,9 +82,23 @@ function Session() {
       }
     );
 
+    // Subscribe to icebreaker state to detect when retrospective is started
+    const unsubscribeIcebreaker = subscribeToIcebreakerState(
+      sessionId,
+      (icebreakerState) => {
+        if (icebreakerState?.retrospectiveStarted) {
+          // If retrospective has been started, save to localStorage and update state
+          localStorage.setItem(retrospectiveStartedKey, 'true');
+          setIcebreakerCompleted(true);
+          setRetrospectiveStarted(true);
+        }
+      }
+    );
+
     return () => {
       unsubscribeBasicInfo();
       unsubscribeRevealed();
+      unsubscribeIcebreaker();
     };
   }, [sessionId, navigate]);
 
@@ -131,6 +158,14 @@ function Session() {
     );
   };
 
+  const handleIcebreakerComplete = () => {
+    setIcebreakerCompleted(true);
+    // If the completion was due to retrospective starting, save to localStorage
+    if (retrospectiveStarted && sessionId) {
+      localStorage.setItem(`${RETROSPECTIVE_STARTED_KEY}${sessionId}`, 'true');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -178,7 +213,7 @@ function Session() {
           sessionId={sessionId}
           currentUser={currentUser}
           users={sessionBasicInfo.users}
-          onComplete={() => setIcebreakerCompleted(true)}
+          onComplete={handleIcebreakerComplete}
         />
 
         <div className="fixed bottom-4 right-4 z-50">
@@ -239,8 +274,9 @@ function Session() {
         )}
       </div>
       
-      {/* User list sidebar */}
-      <div className="fixed bottom-4 right-4 z-50">
+      {/* Bottom bar with Timer and User list */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-4">
+        {currentUser && <Timer currentUser={currentUser} sessionId={sessionId || ''} />}
         <UserList 
           users={sessionBasicInfo?.users || {}} 
           sessionId={sessionId || ''}

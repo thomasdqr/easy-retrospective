@@ -7,6 +7,11 @@
           ".write": true,
           ".validate": "newData.isBoolean()"
         },
+        "timer": {
+          ".read": true,
+          ".write": true,
+          ".validate": "newData.hasChildren(['timeLeft', 'isRunning']) && newData.child('timeLeft').isNumber() && newData.child('isRunning').isBoolean()"
+        },
         "icebreaker": {
           ".read": true,
           ".write": true,

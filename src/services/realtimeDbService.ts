@@ -36,6 +36,7 @@ interface IcebreakerState {
   revealed: boolean;
   completed?: boolean;
   finalLeaderboard?: boolean;
+  retrospectiveStarted?: boolean;
 }
 
 /**
