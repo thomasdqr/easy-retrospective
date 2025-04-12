@@ -195,6 +195,9 @@ function Session() {
   }
 
   if (!icebreakerCompleted && sessionBasicInfo && sessionId) {
+    // Check if the creator is the only person in the session
+    const isCreatorAlone = currentUser?.isCreator && Object.keys(sessionBasicInfo.users || {}).length === 1;
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
         <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4">
@@ -220,20 +223,42 @@ function Session() {
           </div>
         </div>
 
-        <Icebreaker
-          sessionId={sessionId}
-          currentUser={currentUser}
-          users={sessionBasicInfo.users}
-          onComplete={handleIcebreakerComplete}
-        />
+        {isCreatorAlone ? (
+          <div className="flex flex-col items-center justify-center h-screen pt-16">
+            <div className="max-w-4xl mx-auto flex flex-col items-center justify-center p-8 bg-white/80 rounded-lg shadow-lg min-w-[50vw] min-h-[40vh] mt-8 mb-4 text-center">
+              <h2 className="text-3xl font-bold mb-6 text-indigo-800">Waiting for participants...</h2>
+              <p className="text-xl text-gray-700 mb-6">Share the invite link above to invite others to your session.</p>
+              <div className="animate-pulse flex flex-col items-center justify-center">
+                <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-500">The icebreaker will start when others join</p>
+              </div>
+            </div>
+            <div className="fixed bottom-4 right-4 z-50">
+              <UserList 
+                users={sessionBasicInfo.users || {}} 
+                sessionId={sessionId}
+                currentUser={currentUser}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <Icebreaker
+              sessionId={sessionId}
+              currentUser={currentUser}
+              users={sessionBasicInfo.users}
+              onComplete={handleIcebreakerComplete}
+            />
 
-        <div className="fixed bottom-4 right-4 z-50">
-          <UserList 
-            users={sessionBasicInfo.users || {}} 
-            sessionId={sessionId}
-            currentUser={currentUser}
-          />
-        </div>
+            <div className="fixed bottom-4 right-4 z-50">
+              <UserList 
+                users={sessionBasicInfo.users || {}} 
+                sessionId={sessionId}
+                currentUser={currentUser}
+              />
+            </div>
+          </>
+        )}
       </div>
     );
   }
