@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser } from 'lucide-react';
+import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
+import RetroSummary from './RetroSummary';
 import { nanoid } from 'nanoid';
 import { 
   addStickyNote, 
@@ -21,8 +22,10 @@ import {
   updateDrawingPath,
   DrawingPath,
   clearAllDrawings,
-  deleteDrawingPath
+  deleteDrawingPath,
+  subscribeToIcebreakerState
 } from '../services/realtimeDbService';
+import { IcebreakerGameState } from './icebreaker/types';
 
 interface WhiteboardProps {
   sessionId: string;
@@ -112,6 +115,12 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const [isDrawing, setIsDrawing] = useState(false);
   const [isEraser, setIsEraser] = useState(false);
   const [isErasing, setIsErasing] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [icebreakerState, setIcebreakerState] = useState<IcebreakerGameState>({
+    users: {},
+    activeUser: null,
+    revealed: false
+  });
 
   // Memoized array of columns sorted by x position
   const columnsArray = useMemo(() => {
@@ -610,6 +619,10 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     }
   };
 
+  const handleShowSummary = () => {
+    setShowSummary(true);
+  };
+
   const handleAddNote = async (e: React.MouseEvent) => {
     // Prevent adding notes during voting phase
     if (isVotingPhase) return;
@@ -733,6 +746,17 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     }
   }, [externalVotingPhase]);
 
+  // Subscribe to icebreaker state
+  useEffect(() => {
+    const unsubscribe = subscribeToIcebreakerState(sessionId, (state) => {
+      if (state) {
+        setIcebreakerState(state);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [sessionId]);
+
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Whiteboard */}
@@ -850,6 +874,21 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                     <ThumbsUp className="w-4 h-4" />
                     <span className="text-sm font-medium whitespace-nowrap">{isVotingPhase ? "End Voting" : "Start Voting"}</span>
                   </button>
+                  
+                  {isVotingPhase && (
+                    <button
+                      onClick={handleShowSummary}
+                      className="p-2 rounded-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 text-white hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 flex items-center gap-1.5 transition-colors"
+                      title="Generate AI Summary"
+                      style={{ 
+                        animation: 'gradientShift 3s ease infinite, glowPulse 2s ease-in-out infinite',
+                        backgroundSize: '200% 200%'
+                      }}
+                    >
+                      <Brain className="w-4 h-4" />
+                      <span className="text-sm font-medium whitespace-nowrap">AI Summary</span>
+                    </button>
+                  )}
                 </>
               )}
               
@@ -1102,6 +1141,31 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           ))}
         </div>
       </div>
+      
+      {/* RetroSummary Modal */}
+      {showSummary && (
+        <RetroSummary
+          sessionId={sessionId}
+          icebreakerState={icebreakerState}
+          users={users}
+          stickyNotes={stickyNotes}
+          onClose={() => setShowSummary(false)}
+        />
+      )}
+
+      {/* Add keyframe animations to the bottom of the component right before the final return statement */}
+      <style jsx>{`
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes glowPulse {
+          0% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
+          50% { box-shadow: 0 0 20px rgba(167, 139, 250, 0.6); }
+          100% { box-shadow: 0 0 10px rgba(236, 72, 153, 0.4); }
+        }
+      `}</style>
     </div>
   );
 }
