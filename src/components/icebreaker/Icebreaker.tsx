@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { updateIcebreakerState, subscribeToIcebreakerState } from '../../services/realtimeDbService';
 import { IcebreakerProps, Statement, IcebreakerGameState } from './types';
-import { shuffleArray, checkAllSubmitted, checkAllVoted, isLastUser as checkIsLastUser } from './utils';
+import { shuffleArray, checkAllSubmitted, checkAllVoted, isLastUser as checkIsLastUser, getValidUserIds } from './utils';
+import { USER_SESSION_KEY } from '../../constants';
 
 // Import sub-components
 import SubmissionForm from './SubmissionForm';
@@ -30,9 +31,9 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
   const statementOrder = useMemo(() => shuffleArray([0, 1, 2]), []);
 
   // Calculate game state flags
-  const allSubmitted = checkAllSubmitted(gameState, Object.keys(users).length);
-  const allVoted = checkAllVoted(gameState);
-  const isLastUser = checkIsLastUser(gameState);
+  const allSubmitted = checkAllSubmitted(gameState, users);
+  const allVoted = checkAllVoted(gameState, users);
+  const isLastUser = checkIsLastUser(gameState, users);
 
   useEffect(() => {
     const unsubscribe = subscribeToIcebreakerState(sessionId, (state) => {
@@ -61,10 +62,12 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
   useEffect(() => {
     if (allSubmitted && !gameState.activeUser && currentUser.isCreator) {
       // Set first user as active when all have submitted
-      const firstUserId = Object.keys(gameState.users)[0];
-      handleSetActiveUser(firstUserId);
+      const validUserIds = getValidUserIds(users);
+      if (validUserIds.length > 0) {
+        handleSetActiveUser(validUserIds[0]);
+      }
     }
-  }, [gameState.users, gameState.activeUser, currentUser.isCreator, allSubmitted]);
+  }, [gameState.users, gameState.activeUser, currentUser.isCreator, allSubmitted, users]);
 
   // Add debugging useEffect to track gameState changes
   useEffect(() => {
@@ -83,6 +86,47 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
       onComplete();
     }
   }, [gameState.retrospectiveStarted, onComplete]);
+
+  // Add useEffect to watch for kicked users
+  useEffect(() => {
+    // If the current user is no longer in the users list, they were kicked
+    if (Object.keys(users).length > 0 && !users[currentUser.id]) {
+      console.log("User was kicked from session");
+      localStorage.removeItem(USER_SESSION_KEY);
+      window.location.href = '/';
+    }
+  }, [users, currentUser.id]);
+
+  // Add useEffect to initialize game state for users who rejoin
+  useEffect(() => {
+    if (!sessionId || !currentUser || !users[currentUser.id]) return;
+
+    // Check if the user exists in the game state
+    if (!gameState.users[currentUser.id]) {
+      console.log("Initializing game state for rejoined user");
+      const updatedUsers = {
+        ...gameState.users,
+        [currentUser.id]: {
+          statements: {
+            "0": { text: '', isLie: false, revealed: false },
+            "1": { text: '', isLie: false, revealed: false },
+            "2": { text: '', isLie: true, revealed: false }
+          },
+          hasSubmitted: false,
+          votes: {},
+          score: 0,
+          statementOrder: shuffleArray([0, 1, 2])
+        }
+      };
+
+      const newState = {
+        ...gameState,
+        users: updatedUsers
+      };
+
+      updateIcebreakerState(sessionId, newState);
+    }
+  }, [sessionId, currentUser, users, gameState.users]);
 
   const handleSubmit = async () => {
     if (statements.some(s => !s.text.trim())) {
@@ -161,31 +205,41 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
   const handleNextUser = async () => {
     if (!gameState.activeUser || !currentUser.isCreator) return;
     
-    const userIds = Object.keys(gameState.users);
-    const currentIndex = userIds.indexOf(gameState.activeUser);
+    const validUserIds = getValidUserIds(users);
+    const currentIndex = validUserIds.indexOf(gameState.activeUser);
     
     // If we're at the last user and already revealed
-    if (currentIndex === userIds.length - 1 && gameState.revealed) {
+    if (currentIndex === validUserIds.length - 1 && gameState.revealed) {
       console.log("Last user reached and revealed, showing leaderboard");
-      handleShowLeaderboard(); // Use the debounced function
+      handleShowLeaderboard();
       return;
     }
     
-    const nextIndex = (currentIndex + 1) % userIds.length;
-    handleSetActiveUser(userIds[nextIndex]);
+    const nextIndex = (currentIndex + 1) % validUserIds.length;
+    handleSetActiveUser(validUserIds[nextIndex]);
   };
   
   const handlePrevUser = () => {
     if (!gameState.activeUser || !currentUser.isCreator) return;
     
-    const userIds = Object.keys(gameState.users);
-    const currentIndex = userIds.indexOf(gameState.activeUser);
-    const prevIndex = (currentIndex - 1 + userIds.length) % userIds.length;
-    handleSetActiveUser(userIds[prevIndex]);
+    const validUserIds = getValidUserIds(users);
+    const currentIndex = validUserIds.indexOf(gameState.activeUser);
+    const prevIndex = (currentIndex - 1 + validUserIds.length) % validUserIds.length;
+    handleSetActiveUser(validUserIds[prevIndex]);
   };
   
   const handleReveal = async () => {
     if (!currentUser.isCreator || !gameState.activeUser) return;
+    
+    // If already revealed, just toggle the revealed state without recalculating scores
+    if (gameState.revealed) {
+      const newState = {
+        ...gameState,
+        revealed: true
+      };
+      await updateIcebreakerState(sessionId, newState);
+      return;
+    }
     
     // Calculate which users voted correctly for this person's lie
     const activeUserState = gameState.users[gameState.activeUser];
@@ -201,11 +255,16 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
     
     if (lieIndex === -1) return;
     
-    // Update scores for users who guessed correctly
+    // Update scores for users who guessed correctly (only on first reveal)
     const updatedUsers = { ...gameState.users };
+    const validUserIds = getValidUserIds(users);
     
-    Object.entries(updatedUsers).forEach(([userId, userState]) => {
+    // Only process votes from valid users
+    validUserIds.forEach(userId => {
       if (userId === gameState.activeUser) return; // Skip active user
+      
+      const userState = updatedUsers[userId];
+      if (!userState) return; // Skip if user state doesn't exist
       
       const userVote = activeUserState.votes?.[userId];
       // If user voted for the correct lie
@@ -358,17 +417,17 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
                       <div 
                         className="h-2 bg-indigo-600 rounded-full"
                         style={{
-                          width: `${Object.keys(userVotes).length / (Object.keys(users).length - 1) * 100}%`
+                          width: `${Object.keys(userVotes).length / (getValidUserIds(users).length - 1) * 100}%`
                         }}
                       ></div>
                     </div>
                     <div className="ml-4 text-sm font-medium text-gray-700">
-                      {Object.keys(userVotes).length}/{Object.keys(users).length - 1} voted
+                      {Object.keys(userVotes).length}/{getValidUserIds(users).length - 1} voted
                     </div>
                   </div>
                   
                   {/* All users' statements */}
-                  {Object.keys(gameState.users).map(userId => (
+                  {getValidUserIds(users).map(userId => (
                     <div key={userId}>
                       <UserStatements 
                         userId={userId}

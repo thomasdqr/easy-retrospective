@@ -1,4 +1,18 @@
-import { IcebreakerGameState } from './types';
+import { IcebreakerGameState, User } from './types';
+
+/**
+ * Get list of valid (non-kicked) users
+ */
+export const getValidUsers = (users: Record<string, User>): [string, User][] => {
+  return Object.entries(users).filter(([, user]) => user !== null && user !== undefined);
+};
+
+/**
+ * Get list of valid user IDs
+ */
+export const getValidUserIds = (users: Record<string, User>): string[] => {
+  return getValidUsers(users).map(([userId]) => userId);
+};
 
 /**
  * Utility function to shuffle an array
@@ -13,30 +27,41 @@ export const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 /**
- * Check if all users have submitted their statements
+ * Check if all valid users have submitted their statements
  */
-export const checkAllSubmitted = (gameState: IcebreakerGameState, userCount: number): boolean => {
-  return Object.keys(gameState.users).length === userCount &&
-    Object.values(gameState.users).every(state => state.hasSubmitted);
+export const checkAllSubmitted = (gameState: IcebreakerGameState, users: Record<string, User>): boolean => {
+  const validUserIds = getValidUserIds(users);
+  
+  // Only check submissions for valid users
+  const validUsersSubmitted = validUserIds.every(userId => gameState.users[userId]?.hasSubmitted);
+  const validUserCount = validUserIds.length;
+  const gameStateUserCount = Object.keys(gameState.users).length;
+
+  return validUsersSubmitted && gameStateUserCount >= validUserCount;
 };
 
 /**
  * Check if all users have voted
  */
-export const checkAllVoted = (gameState: IcebreakerGameState): boolean => {
-  return Object.keys(gameState.users).every(userId => {
-    const votesReceived = Object.values(gameState.users).filter(state => 
-      state.votes && state.votes[userId] !== undefined
+export const checkAllVoted = (gameState: IcebreakerGameState, users: Record<string, User>): boolean => {
+  const validUserIds = getValidUserIds(users);
+  
+  return validUserIds.every(userId => {
+    const votesReceived = validUserIds.filter(voterId => 
+      gameState.users[voterId]?.votes && 
+      gameState.users[voterId].votes[userId] !== undefined &&
+      voterId !== userId // excluding self-vote
     ).length;
-    return votesReceived >= Object.keys(gameState.users).length - 1; // excluding self-vote
+    return votesReceived >= validUserIds.length - 1; // excluding self-vote
   });
 };
 
 /**
  * Check if current user is viewing the last user
  */
-export const isLastUser = (gameState: IcebreakerGameState): boolean => {
+export const isLastUser = (gameState: IcebreakerGameState, users: Record<string, User>): boolean => {
+  const validUserIds = getValidUserIds(users);
   return gameState.activeUser ? 
-    Object.keys(gameState.users).indexOf(gameState.activeUser) === Object.keys(gameState.users).length - 1 
+    validUserIds.indexOf(gameState.activeUser) === validUserIds.length - 1 
     : false;
 }; 

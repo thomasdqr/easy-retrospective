@@ -9,9 +9,7 @@ import { Copy, EyeOff } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
 import { subscribeToSessionRevealed, toggleSessionReveal } from '../services/realtimeDbService';
-
-// Constants for localStorage
-const USER_SESSION_KEY = 'retrospective_user_session';
+import { USER_SESSION_KEY } from '../constants';
 
 function Session() {
   const { sessionId } = useParams();
@@ -76,6 +74,15 @@ function Session() {
       unsubscribeRevealed();
     };
   }, [sessionId, navigate]);
+
+  // Handle kicked users
+  useEffect(() => {
+    if (sessionBasicInfo && currentUser && Object.keys(sessionBasicInfo.users).length > 0 && !sessionBasicInfo.users[currentUser.id]) {
+      console.log("User was kicked from session");
+      localStorage.removeItem(USER_SESSION_KEY);
+      navigate('/');
+    }
+  }, [sessionBasicInfo, currentUser, navigate]);
 
   const handleUserComplete = async (userData: Omit<User, 'id'>) => {
     if (!sessionId || !sessionBasicInfo) return;
@@ -175,7 +182,11 @@ function Session() {
         />
 
         <div className="fixed bottom-4 right-4 z-50">
-          <UserList users={sessionBasicInfo.users || {}} />
+          <UserList 
+            users={sessionBasicInfo.users || {}} 
+            sessionId={sessionId}
+            currentUser={currentUser}
+          />
         </div>
       </div>
     );
@@ -230,7 +241,11 @@ function Session() {
       
       {/* User list sidebar */}
       <div className="fixed bottom-4 right-4 z-50">
-        <UserList users={sessionBasicInfo?.users || {}} />
+        <UserList 
+          users={sessionBasicInfo?.users || {}} 
+          sessionId={sessionId || ''}
+          currentUser={currentUser}
+        />
       </div>
     </div>
   );

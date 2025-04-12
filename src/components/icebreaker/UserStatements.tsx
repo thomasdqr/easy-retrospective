@@ -1,5 +1,6 @@
 import React from 'react';
 import { UserStatementsProps } from './types';
+import { getValidUserIds } from './utils';
 
 const UserStatements: React.FC<UserStatementsProps> = ({
   userId,
@@ -21,24 +22,36 @@ const UserStatements: React.FC<UserStatementsProps> = ({
   }));
   
   const myVote = userVotes[userId];
-  const isVoting = !Object.keys(gameState.users).every(userId => {
-    const votesReceived = Object.values(gameState.users).filter(state => 
-      state.votes && state.votes[userId] !== undefined
+  const validUserIds = getValidUserIds(users);
+  const validUserCount = validUserIds.length;
+
+  // Check if we're in voting phase by checking if all valid users have voted
+  const isVoting = !validUserIds.every(userId => {
+    const votesReceived = validUserIds.filter(voterId => 
+      gameState.users[voterId]?.votes && 
+      gameState.users[voterId].votes[userId] !== undefined &&
+      voterId !== userId // excluding self-vote
     ).length;
-    return votesReceived >= Object.keys(users).length - 1;
+    return votesReceived >= validUserCount - 1; // excluding self-vote
   });
+
   const hasVotedForThisUser = myVote !== undefined;
-  const isRevealed = gameState.revealed;
+  const isRevealed = gameState.revealed && gameState.activeUser === userId;
   
   // Count votes for each statement (only in results phase)
   const voteCount = !isVoting ? [0, 1, 2].map((originalIndex) => {
     if (!state.votes) return 0;
-    return Object.values(state.votes).filter(vote => vote === originalIndex).length;
+    return validUserIds.filter(voterId => 
+      voterId !== userId && // exclude self
+      state.votes[voterId] === originalIndex
+    ).length;
   }) : [];
 
   // For displaying correct guessers when revealed
   const correctGuessers = !isVoting && isRevealed ? Object.entries(state.votes || {})
-    .filter(([, voteIndex]) => {
+    .filter(([voterId, voteIndex]) => {
+      // Only include valid users
+      if (!validUserIds.includes(voterId) || voterId === userId) return false;
       // Find which statement is the lie
       const lieIndex = Object.values(state.statements).findIndex(s => s.isLie);
       return voteIndex === lieIndex;
@@ -100,7 +113,7 @@ const UserStatements: React.FC<UserStatementsProps> = ({
                 <span className="text-gray-800">{statement.text}</span>
                 
                 <div className="flex items-center gap-2">
-                  {isRevealed && !isVoting && (
+                  {isRevealed && (
                     <span className={`${isLie ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} text-xs font-semibold px-2.5 py-0.5 rounded`}>
                       {isLie ? 'LIE' : 'TRUTH'}
                     </span>
@@ -123,7 +136,7 @@ const UserStatements: React.FC<UserStatementsProps> = ({
       </div>
       
       {/* Show who guessed correctly when revealed */}
-      {isRevealed && !isVoting && correctGuessers.length > 0 && (
+      {isRevealed && correctGuessers.length > 0 && (
         <div className="mt-4 p-3 bg-indigo-50 rounded-md">
           <p className="text-sm font-medium text-indigo-700">
             Correct guessers: {correctGuessers.join(', ')}

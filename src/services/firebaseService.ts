@@ -1,4 +1,4 @@
-import { doc, setDoc, updateDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, Unsubscribe, deleteField } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { User } from '../types';
 
@@ -125,4 +125,17 @@ export const addUserToSession = async (
   };
   
   await updateSessionBasicInfo(sessionId, updates);
+};
+
+/**
+ * Remove a user from a session
+ */
+export const removeUserFromSession = async (
+  sessionId: string,
+  userId: string
+): Promise<void> => {
+  const sessionDoc = doc(db, 'sessions', sessionId);
+  await updateDoc(sessionDoc, {
+    [`users.${userId}`]: deleteField()
+  });
 }; 
