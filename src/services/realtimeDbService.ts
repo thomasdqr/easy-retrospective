@@ -40,6 +40,17 @@ interface IcebreakerState {
 }
 
 /**
+ * Drawing path interface
+ */
+export interface DrawingPath {
+  id: string;
+  points: { x: number; y: number }[];
+  color: string;
+  width: number;
+  authorId: string;
+}
+
+/**
  * Subscribe to real-time cursors data
  * Returns an unsubscribe function
  */
@@ -627,4 +638,88 @@ export const toggleVoteForStickyNote = async (
   
   // Update the votes
   await set(votesRef, votes);
+};
+
+/**
+ * Subscribe to drawing paths
+ */
+export const subscribeToDrawings = (
+  sessionId: string,
+  onDrawingsUpdate: (drawings: Record<string, DrawingPath>) => void
+) => {
+  const path = `drawings/${sessionId}`;
+  const drawingsRef = ref(realtimeDb, path);
+  
+  // Re-use existing subscription if available
+  if (activeRtSubscriptions[path]) {
+    console.log('Using existing drawings subscription');
+    const existingRef = activeRtSubscriptions[path];
+    onValue(existingRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      onDrawingsUpdate(data);
+    });
+    
+    return () => {
+      off(existingRef);
+      delete activeRtSubscriptions[path];
+    };
+  }
+  
+  // Create new subscription
+  console.log(`Creating new subscription for drawings in session ${sessionId}`);
+  activeRtSubscriptions[path] = drawingsRef;
+  
+  onValue(drawingsRef, (snapshot) => {
+    const data = snapshot.val() || {};
+    onDrawingsUpdate(data);
+  });
+  
+  return () => {
+    off(drawingsRef);
+    delete activeRtSubscriptions[path];
+  };
+};
+
+/**
+ * Add a new drawing path
+ */
+export const addDrawingPath = async (
+  sessionId: string,
+  path: DrawingPath
+): Promise<void> => {
+  const drawingRef = ref(realtimeDb, `drawings/${sessionId}/${path.id}`);
+  await set(drawingRef, path);
+};
+
+/**
+ * Update an existing drawing path with new points
+ */
+export const updateDrawingPath = async (
+  sessionId: string,
+  pathId: string,
+  points: { x: number; y: number }[]
+): Promise<void> => {
+  const pointsRef = ref(realtimeDb, `drawings/${sessionId}/${pathId}/points`);
+  await set(pointsRef, points);
+};
+
+/**
+ * Clear all drawings
+ */
+export const clearAllDrawings = async (
+  sessionId: string
+): Promise<void> => {
+  const drawingsRef = ref(realtimeDb, `drawings/${sessionId}`);
+  await set(drawingsRef, null);
+};
+
+/**
+ * Delete a specific drawing path
+ */
+export const deleteDrawingPath = async (
+  sessionId: string,
+  pathId: string
+): Promise<void> => {
+  const drawingRef = ref(realtimeDb, `drawings/${sessionId}/${pathId}`);
+  await set(drawingRef, null);
 }; 

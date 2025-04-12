@@ -100,6 +100,15 @@
           ".validate": "newData.hasChildren(['x', 'y', 'lastUpdate']) && newData.child('x').isNumber() && newData.child('y').isNumber() && newData.child('lastUpdate').isNumber()"
         }
       }
+    },
+    "drawings": {
+      "$sessionId": {
+        ".read": true,
+        ".write": true,
+        "$pathId": {
+          ".validate": "newData.hasChildren(['id', 'points', 'color', 'width', 'authorId']) && newData.child('id').isString() && newData.child('color').isString() && newData.child('width').isNumber() && newData.child('authorId').isString() && newData.child('points').hasChildren()"
+        }
+      }
     }
   }
 }

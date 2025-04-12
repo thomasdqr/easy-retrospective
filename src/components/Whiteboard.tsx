@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp } from 'lucide-react';
+import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import { nanoid } from 'nanoid';
 import { 
@@ -15,7 +15,13 @@ import {
   updateColumn,
   deleteColumn,
   toggleVotingPhase,
-  subscribeToVotingPhase
+  subscribeToVotingPhase,
+  subscribeToDrawings,
+  addDrawingPath,
+  updateDrawingPath,
+  DrawingPath,
+  clearAllDrawings,
+  deleteDrawingPath
 } from '../services/realtimeDbService';
 
 interface WhiteboardProps {
@@ -72,6 +78,13 @@ const AVAILABLE_COLORS = [
   'bg-teal-200'
 ];
 
+// Colors available for drawing
+const DRAWING_COLORS = [
+  '#FF0000', // Red
+  '#0000FF', // Blue
+  '#000000'  // Black
+];
+
 function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggleReveal, isVotingPhase: externalVotingPhase }: WhiteboardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater>>();
@@ -89,6 +102,16 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const [boardDimensions, setBoardDimensions] = useState({ width: 0, height: 0 });
   const hasPannedRef = useRef<boolean>(false);
   const [isVotingPhase, setIsVotingPhase] = useState(externalVotingPhase || false);
+
+  // Drawing states
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
+  const [drawings, setDrawings] = useState<Record<string, DrawingPath>>({});
+  const [drawingColor, setDrawingColor] = useState('#000000');
+  const [drawingWidth, setDrawingWidth] = useState(3);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [isEraser, setIsEraser] = useState(false);
+  const [isErasing, setIsErasing] = useState(false);
 
   // Memoized array of columns sorted by x position
   const columnsArray = useMemo(() => {
@@ -301,7 +324,209 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     };
   }, [sessionId, currentUser.id, pan]);
 
+  // Subscribe to drawings
+  useEffect(() => {
+    const unsubscribe = subscribeToDrawings(sessionId, (drawingsData) => {
+      setDrawings(drawingsData);
+    });
+    
+    return unsubscribe;
+  }, [sessionId]);
+
+  // Handle starting a drawing
+  const handleStartDrawing = (e: React.MouseEvent) => {
+    if (!isDrawingMode || isPanning) return;
+    
+    e.stopPropagation();
+    
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    
+    // Get board element position
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+    
+    // Simple offset from the viewport, no need to adjust for pan here
+    // since the points will be drawn relative to the panned board position
+    const adjustedX = mouseX - boardRect.left;
+    const adjustedY = mouseY - boardRect.top;
+
+    if (isEraser) {
+      // Set erasing state to true when mouse is pressed
+      setIsErasing(true);
+      // Check for collision with existing drawings and erase them
+      checkAndEraseDrawings(adjustedX, adjustedY);
+    } else {
+      // Create a new path for drawing
+      const pathId = nanoid();
+      
+      const newPath: DrawingPath = {
+        id: pathId,
+        points: [{ x: adjustedX, y: adjustedY }],
+        color: drawingColor,
+        width: drawingWidth,
+        authorId: currentUser.id
+      };
+      
+      setCurrentPath(newPath);
+      setIsDrawing(true);
+      
+      // Save the initial path to the database
+      addDrawingPath(sessionId, newPath);
+    }
+  };
+
+  // Handle continuing a drawing
+  const handleDrawing = (e: React.MouseEvent) => {
+    if (!isDrawingMode) return;
+    
+    e.stopPropagation();
+    
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    
+    // Get board element position
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+    
+    // Simple offset from the viewport, no need to adjust for pan here
+    const adjustedX = mouseX - boardRect.left;
+    const adjustedY = mouseY - boardRect.top;
+    
+    if (isEraser && isErasing) {
+      // Only erase if the mouse button is pressed (isErasing is true)
+      checkAndEraseDrawings(adjustedX, adjustedY);
+    } else if (isDrawing && currentPath) {
+      // Continue drawing the current path
+      const updatedPoints = [...currentPath.points, { x: adjustedX, y: adjustedY }];
+      
+      // Update the current path
+      setCurrentPath({
+        ...currentPath,
+        points: updatedPoints
+      });
+      
+      // Update the path in the database
+      updateDrawingPath(sessionId, currentPath.id, updatedPoints);
+    }
+  };
+
+  // Check for collision with existing drawings and erase them
+  const checkAndEraseDrawings = (x: number, y: number) => {
+    const eraserRadius = drawingWidth * 2; // Make eraser a bit bigger than the pen
+    
+    // Check each drawing for collision with the eraser
+    Object.values(drawings).forEach(path => {
+      // Skip checking if the path has been deleted
+      if (!path || !path.points || path.points.length === 0) return;
+      
+      // Check if the eraser is close to any segment of this path
+      for (let i = 1; i < path.points.length; i++) {
+        const p1 = path.points[i - 1];
+        const p2 = path.points[i];
+        
+        // Calculate distance from point to line segment
+        const distance = distanceToLineSegment(p1, p2, { x, y });
+        
+        // If within erasing distance, delete the path
+        if (distance < eraserRadius + (path.width / 2)) {
+          deleteDrawingPath(sessionId, path.id);
+          break; // Move to the next path
+        }
+      }
+      
+      // Also check if we're close to any individual point
+      for (const point of path.points) {
+        const distance = Math.sqrt(
+          Math.pow(point.x - x, 2) + Math.pow(point.y - y, 2)
+        );
+        
+        if (distance < eraserRadius + (path.width / 2)) {
+          deleteDrawingPath(sessionId, path.id);
+          break; // Move to the next path
+        }
+      }
+    });
+  };
+  
+  // Calculate distance from a point to a line segment
+  const distanceToLineSegment = (
+    p1: { x: number; y: number }, 
+    p2: { x: number; y: number }, 
+    point: { x: number; y: number }
+  ) => {
+    const A = point.x - p1.x;
+    const B = point.y - p1.y;
+    const C = p2.x - p1.x;
+    const D = p2.y - p1.y;
+    
+    const dot = A * C + B * D;
+    const len_sq = C * C + D * D;
+    let param = -1;
+    
+    if (len_sq !== 0) // in case of 0 length line
+      param = dot / len_sq;
+    
+    let xx, yy;
+    
+    if (param < 0) {
+      xx = p1.x;
+      yy = p1.y;
+    } else if (param > 1) {
+      xx = p2.x;
+      yy = p2.y;
+    } else {
+      xx = p1.x + param * C;
+      yy = p1.y + param * D;
+    }
+    
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+    
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Handle ending a drawing
+  const handleEndDrawing = () => {
+    if (isErasing) {
+      setIsErasing(false);
+    }
+    
+    if (!isDrawing) return;
+    
+    setIsDrawing(false);
+    setCurrentPath(null);
+  };
+
+  // Toggle drawing mode
+  const toggleDrawingMode = () => {
+    setIsDrawingMode(!isDrawingMode);
+    // Reset eraser when toggling drawing mode
+    if (!isDrawingMode) {
+      setIsEraser(false);
+    }
+  };
+
+  // Toggle eraser mode
+  const toggleEraser = () => {
+    setIsEraser(!isEraser);
+  };
+
+  // Clear all drawings
+  const handleClearDrawings = async () => {
+    if (currentUser.isCreator) {
+      await clearAllDrawings(sessionId);
+    }
+  };
+
+  // Modified mouse handlers to support drawing
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Skip if we're in drawing mode (the drawing overlay will handle this)
+    if (isDrawingMode) {
+      return;
+    }
+    
+    // Original panning logic
     // Only enable panning when clicking directly on the sticky notes container
     // and not on any sticky notes themselves
     if (e.button === 0 && (e.target === boardRef.current || e.currentTarget.contains(e.target as Node))) {
@@ -323,6 +548,12 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    // Skip if we're in drawing mode (the drawing overlay will handle this)
+    if (isDrawingMode) {
+      return;
+    }
+    
+    // Original panning logic
     if (isPanning) {
       const deltaX = e.clientX - lastPanPosition.current.x;
       const deltaY = e.clientY - lastPanPosition.current.y;
@@ -343,6 +574,12 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
+    // Skip if we're in drawing mode (the drawing overlay will handle this)
+    if (isDrawingMode) {
+      return;
+    }
+    
+    // Original panning/click logic
     if (isPanning) {
       // If the mouse is released and there was no significant panning, consider it a click
       if (!hasPannedRef.current) {
@@ -506,7 +743,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         onMouseLeave={handleMouseUp}
         className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative flex-grow"
         style={{
-          cursor: isPanning ? 'grabbing' : 'default'
+          cursor: isDrawingMode ? 'crosshair' : isPanning ? 'grabbing' : 'default'
         }}
       >
         {/* Floating Toolbar */}
@@ -519,6 +756,64 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
             <Focus className="w-4 h-4" />
             <span className="text-sm font-medium">Center</span>
           </button>
+          
+          {/* Drawing mode toggle button - always visible regardless of voting phase */}
+          <button
+            onClick={toggleDrawingMode}
+            className={`p-2 rounded-full ${isDrawingMode ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 hover:text-blue-700 flex items-center gap-1.5 transition-colors`}
+            title={isDrawingMode ? "Exit Drawing Mode" : "Draw on Whiteboard"}
+          >
+            <PencilLine className="w-4 h-4" />
+            <span className="text-sm font-medium">{isDrawingMode ? "Drawing" : "Draw"}</span>
+          </button>
+          
+          {/* Drawing options - only show when in drawing mode */}
+          {isDrawingMode && (
+            <>
+              <div className="flex gap-2 items-center">
+                {DRAWING_COLORS.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => {
+                      setDrawingColor(color);
+                      setIsEraser(false);
+                    }}
+                    className={`w-6 h-6 rounded-full cursor-pointer ${isEraser ? '' : drawingColor === color ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
+                    style={{ backgroundColor: color }}
+                    title={`Use ${color === '#FF0000' ? 'Red' : color === '#0000FF' ? 'Blue' : 'Black'} Color`}
+                  />
+                ))}
+                <button
+                  onClick={toggleEraser}
+                  className={`p-2 rounded-full ${isEraser ? 'bg-blue-100 text-blue-700 ring-2 ring-offset-1 ring-blue-500' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 flex items-center transition-colors`}
+                  title="Eraser"
+                >
+                  <Eraser className="w-4 h-4" />
+                </button>
+              </div>
+              <select 
+                value={drawingWidth}
+                onChange={(e) => setDrawingWidth(Number(e.target.value))}
+                className="p-1 rounded bg-gray-50 text-xs"
+                title="Line Width"
+              >
+                <option value="1">Thin</option>
+                <option value="3">Medium</option>
+                <option value="5">Thick</option>
+                <option value="8">Extra Thick</option>
+              </select>
+              {currentUser.isCreator && (
+                <button
+                  onClick={handleClearDrawings}
+                  className="p-2 rounded-full bg-red-50 text-red-700 hover:bg-red-100 flex items-center gap-1.5 transition-colors"
+                  title="Clear All Drawings"
+                >
+                  <Eraser className="w-4 h-4" />
+                  <span className="text-sm font-medium">Clear</span>
+                </button>
+              )}
+            </>
+          )}
           
           {currentUser.isCreator && !isVotingPhase && (
             <button
@@ -577,7 +872,8 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           {/* Column backgrounds, headers, and vertical dividers */}
           <div className="absolute inset-0 flex h-auto" style={{ 
             width: `${columnsArray.reduce((sum, col) => sum + col.position.width, 0)}px`,
-            minHeight: '100%'
+            minHeight: '100%',
+            zIndex: 10
           }}>
             {columnsArray.map((column, index) => (
               <div
@@ -707,22 +1003,76 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
             ))}
           </div>
           
+          {/* Drawing layer - SVG for better performance */}
+          <svg 
+            className="absolute inset-0 pointer-events-none" 
+            style={{ 
+              minHeight: '3000px', 
+              width: '100%',
+              minWidth: `${columnsArray.reduce((sum, col) => sum + col.position.width, 0)}px`,
+              zIndex: 20
+            }}
+          >
+            {/* Render all saved drawings */}
+            {Object.values(drawings).map((path) => (
+              <polyline
+                key={path.id}
+                points={path.points.map(p => `${p.x},${p.y}`).join(' ')}
+                fill="none"
+                stroke={path.color}
+                strokeWidth={path.width}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+            
+            {/* Render current drawing path */}
+            {currentPath && (
+              <polyline
+                points={currentPath.points.map(p => `${p.x},${p.y}`).join(' ')}
+                fill="none"
+                stroke={currentPath.color}
+                strokeWidth={currentPath.width}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+          </svg>
+
           {/* Sticky Notes */}
-          {stickyNotesArray.map((note) => (
-            <StickyNoteComponent
-              key={note.id}
-              note={note}
-              sessionId={sessionId}
-              currentUser={currentUser}
-              isRevealed={isRevealed}
-              author={users[note.authorId]}
-              isVotingPhase={isVotingPhase}
+          <div style={{ position: 'relative', zIndex: 30 }}>
+            {stickyNotesArray.map((note) => (
+              <StickyNoteComponent
+                key={note.id}
+                note={note}
+                sessionId={sessionId}
+                currentUser={currentUser}
+                isRevealed={isRevealed}
+                author={users[note.authorId]}
+                isVotingPhase={isVotingPhase}
+              />
+            ))}
+          </div>
+
+          {/* Drawing overlay to capture mouse events when in drawing mode */}
+          {isDrawingMode && (
+            <div 
+              className="absolute inset-0 cursor-crosshair" 
+              style={{ 
+                zIndex: 40,
+                minHeight: '3000px',
+                minWidth: `${columnsArray.reduce((sum, col) => sum + col.position.width, 0)}px`
+              }}
+              onMouseDown={handleStartDrawing}
+              onMouseMove={isEraser || isDrawing ? handleDrawing : undefined}
+              onMouseUp={handleEndDrawing}
+              onMouseLeave={handleEndDrawing}
             />
-          ))}
+          )}
         </div>
         
         {/* User cursors (always on top) */}
-        <div className="absolute inset-0 pointer-events-none z-30">
+        <div className="absolute inset-0 pointer-events-none z-50">
           {cursors.map(({ userId, user, position }) => (
             <div
               key={userId}
