@@ -1149,6 +1149,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           icebreakerState={icebreakerState}
           users={users}
           stickyNotes={stickyNotes}
+          columns={columns}
           onClose={() => setShowSummary(false)}
         />
       )}

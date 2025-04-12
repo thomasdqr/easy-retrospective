@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { IcebreakerGameState } from '../components/icebreaker/types';
-import { StickyNote, User } from '../types';
+import { StickyNote, User, Column } from '../types';
 import { generateRetroSummary, setGeminiApiConfig, getGeminiApiConfig } from '../services/geminiService';
 import { X, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -11,6 +11,7 @@ interface RetroSummaryProps {
   icebreakerState: IcebreakerGameState;
   users: Record<string, User>;
   stickyNotes: Record<string, StickyNote>;
+  columns?: Record<string, Column>;
   onClose: () => void;
 }
 
@@ -18,7 +19,8 @@ const RetroSummary: React.FC<RetroSummaryProps> = ({
   sessionId, 
   icebreakerState, 
   users, 
-  stickyNotes, 
+  stickyNotes,
+  columns,
   onClose 
 }) => {
   const [summary, setSummary] = useState<string>('');
@@ -46,7 +48,8 @@ const RetroSummary: React.FC<RetroSummaryProps> = ({
       const summaryText = await generateRetroSummary({
         icebreakerState,
         users,
-        stickyNotes
+        stickyNotes,
+        columns
       });
       setSummary(summaryText);
     } catch (err) {

@@ -1,5 +1,5 @@
 import { IcebreakerGameState } from '../components/icebreaker/types';
-import { StickyNote, User } from '../types';
+import { StickyNote, User, Column } from '../types';
 
 // Gemini API endpoints and models
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -9,6 +9,7 @@ interface RetroSummaryData {
   icebreakerState: IcebreakerGameState;
   users: Record<string, User>;
   stickyNotes: Record<string, StickyNote>;
+  columns?: Record<string, Column>;
 }
 
 export interface GeminiApiConfig {
@@ -73,6 +74,34 @@ export const generateRetroSummary = async (data: RetroSummaryData): Promise<stri
     };
   }).sort((a, b) => b.votes - a.votes);
 
+  // Group sticky notes by column ID
+  const stickyNotesByColumn: Record<string, { 
+    columnId: string, 
+    columnTitle: string,
+    notes: { content: string, votes: number }[] 
+  }> = {};
+  
+  stickyNotesWithVotes.forEach(note => {
+    if (note.columnId) {
+      if (!stickyNotesByColumn[note.columnId]) {
+        // Get column title if available, or use column ID as fallback
+        const columnTitle = data.columns && data.columns[note.columnId] 
+          ? data.columns[note.columnId].title 
+          : note.columnId;
+          
+        stickyNotesByColumn[note.columnId] = {
+          columnId: note.columnId,
+          columnTitle: columnTitle,
+          notes: []
+        };
+      }
+      stickyNotesByColumn[note.columnId].notes.push({
+        content: note.content,
+        votes: note.votes
+      });
+    }
+  });
+
   // Prepare the prompt for Gemini
   const prompt = `
     Generate a fun and professional retrospective summary with the following data:
@@ -90,18 +119,19 @@ export const generateRetroSummary = async (data: RetroSummaryData): Promise<stri
     Winner: ${winner.name} (Score: ${winner.score})
     
     Retrospective feedback by category:
-    ${stickyNotesWithVotes.map(note => `- ${note.content} (Votes: ${note.votes}, Column: ${note.columnId})`).join('\n')}
+    ${Object.values(stickyNotesByColumn).map(column => {
+      return `${column.columnTitle}:\n${column.notes.map(note => 
+        `- ${note.content} (Votes: ${note.votes})`).join('\n')}`;
+    }).join('\n\n')}
     
     Please structure the summary as follows:
     1. A fun introduction mentioning the icebreaker activity with a title using markdown heading (##). 
        IMPORTANT: In "Two Truths and a Lie", a high score means the person was GOOD at detecting the lies, 
        not bad at it. Highlight the winner as the best detective ! Include 1-2 interesting or funny statements from participants.
     
-    2. Key insights from "What Went Well" (most voted items) with a section heading using markdown (##)
-    
-    3. Areas for improvement from "What Needs Improvement" (most voted items) with a section heading using markdown (##)
-    
-    4. Recommended action items from "What can we do better?" (most voted items) with a section heading using markdown (##)
+    ${Object.values(stickyNotesByColumn).map((column, index) => {
+      return `${index + 2}. Key insights from "${column.columnTitle}" (most voted items) with a section heading using markdown (##)`;
+    }).join('\n\n')}
     
     Do not mention every sticky note in the summary. Group similar ideas together if there are multiple sticky notes with the same idea.
     Focus on the ideas with the most votes.
