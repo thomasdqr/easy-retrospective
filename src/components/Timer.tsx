@@ -170,7 +170,10 @@ const Timer: React.FC<TimerProps> = ({ currentUser, sessionId }) => {
                 )}
                 {timeLeft === 0 && (
                   <button
-                    onClick={() => setShowInput(true)}
+                    onClick={() => {
+                      setMinutes(10);
+                      setShowInput(true);
+                    }}
                     className="p-1.5 rounded-md bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center gap-2 px-3"
                   >
                     <span className="text-sm">Add timer</span>
