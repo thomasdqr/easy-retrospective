@@ -7,6 +7,11 @@
           ".write": true,
           ".validate": "newData.isBoolean()"
         },
+        "votingPhase": {
+          ".read": true,
+          ".write": true,
+          ".validate": "newData.isBoolean()"
+        },
         "timer": {
           ".read": true,
           ".write": true,
@@ -49,7 +54,14 @@
         ".read": true,
         "$noteId": {
           ".write": true,
-          ".validate": "newData.hasChildren(['id', 'content', 'authorId', 'position', 'color']) && newData.child('id').isString() && newData.child('content').isString() && newData.child('authorId').isString() && newData.child('position').hasChildren(['x', 'y']) && newData.child('position/x').isNumber() && newData.child('position/y').isNumber() && newData.child('color').isString()"
+          ".validate": "newData.hasChildren(['id', 'content', 'authorId', 'position', 'color']) && newData.child('id').isString() && newData.child('content').isString() && newData.child('authorId').isString() && newData.child('position').hasChildren(['x', 'y']) && newData.child('position/x').isNumber() && newData.child('position/y').isNumber() && newData.child('color').isString()",
+          "votes": {
+            ".read": true,
+            ".write": true,
+            "$userId": {
+              ".validate": "newData.isBoolean() || newData.val() == null"
+            }
+          }
         }
       }
     },
@@ -63,6 +75,15 @@
       }
     },
     "notesMoving": {
+      "$sessionId": {
+        ".read": true,
+        "$noteId": {
+          ".write": true,
+          ".validate": "newData.isString() || newData.val() == null"
+        }
+      }
+    },
+    "notesEditing": {
       "$sessionId": {
         ".read": true,
         "$noteId": {

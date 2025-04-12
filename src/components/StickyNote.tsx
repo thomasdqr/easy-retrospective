@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StickyNote, User } from '../types';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ThumbsUp } from 'lucide-react';
 import {
   createNoteContentUpdater,
   deleteStickyNote,
@@ -11,6 +11,7 @@ import {
   subscribeToNotesPosition,
   subscribeToNotesEditing,
   setNoteEditingStatus,
+  toggleVoteForStickyNote
 } from '../services/realtimeDbService';
 
 // Function to generate random characters
@@ -29,9 +30,10 @@ interface StickyNoteProps {
   currentUser: User;
   isRevealed: boolean;
   author: User;
+  isVotingPhase: boolean;
 }
 
-function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author }: StickyNoteProps) {
+function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author, isVotingPhase }: StickyNoteProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState(note.position);
   const [isEditing, setIsEditing] = useState(false);
@@ -50,9 +52,15 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
   const isAuthor = currentUser.id === note.authorId;
   const isBeingMovedBySomeoneElse = notesMoving[note.id] && notesMoving[note.id] !== currentUser.id;
   const isBeingEditedBySomeoneElse = notesEditing[note.id] && notesEditing[note.id] !== currentUser.id;
-  const canMove = !isBeingMovedBySomeoneElse && !isEditing && !isBeingEditedBySomeoneElse;
-  const canEdit = isAuthor && !isBeingMovedBySomeoneElse && !isBeingEditedBySomeoneElse;
+  const canMove = !isBeingMovedBySomeoneElse && !isEditing && !isBeingEditedBySomeoneElse && !isVotingPhase;
+  const canEdit = isAuthor && !isBeingMovedBySomeoneElse && !isBeingEditedBySomeoneElse && !isVotingPhase;
   const shouldShowContent = isRevealed || isAuthor;
+
+  // Count the number of votes
+  const voteCount = note.votes ? Object.values(note.votes).filter(Boolean).length : 0;
+  
+  // Check if current user has voted for this note
+  const hasVoted = note.votes && note.votes[currentUser.id];
 
   // Generate masked content when isRevealed changes
   useEffect(() => {
@@ -234,6 +242,13 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
     await deleteStickyNote(sessionId, note.id);
   };
 
+  const handleVoteToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isVotingPhase) {
+      await toggleVoteForStickyNote(sessionId, note.id, currentUser.id);
+    }
+  };
+
   // Get display content
   const getDisplayContent = () => {
     if (shouldShowContent) {
@@ -270,14 +285,31 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
             {isBeingEditedBySomeoneElse && ' (editing...)'}
           </span>
         </div>
-        {isAuthor && !isBeingMovedBySomeoneElse && !isBeingEditedBySomeoneElse && (
-          <button
-            onClick={handleDelete}
-            className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {isVotingPhase && (
+            <button
+              onClick={handleVoteToggle}
+              className={`flex items-center gap-1 text-sm font-medium px-1.5 py-1 rounded ${
+                hasVoted 
+                  ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              } transition-colors`}
+              title={hasVoted ? "Remove vote" : "Vote for this idea"}
+            >
+              <ThumbsUp className="w-3 h-3" />
+              <span>{voteCount || 0}</span>
+            </button>
+          )}
+          
+          {isAuthor && !isBeingMovedBySomeoneElse && !isBeingEditedBySomeoneElse && !isVotingPhase && (
+            <button
+              onClick={handleDelete}
+              className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {isEditing && canEdit ? (
@@ -291,7 +323,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author 
         />
       ) : (
         <div
-          onClick={handleEditStart}
+          onClick={canEdit ? handleEditStart : undefined}
           className={`min-h-[3em] p-1 rounded ${!shouldShowContent && 'blur-sm'} ${
             canEdit && !isDragging ? 'cursor-text hover:bg-black/5' : ''
           } overflow-hidden break-words`}

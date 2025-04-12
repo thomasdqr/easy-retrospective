@@ -1,4 +1,4 @@
-import { ref, set, onValue, off, DatabaseReference } from 'firebase/database';
+import { ref, set, onValue, off, DatabaseReference, get, DataSnapshot } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 import { StickyNote } from '../types';
 
@@ -573,4 +573,58 @@ export const subscribeToIcebreakerState = (sessionId: string, callback: (state: 
   });
 
   return unsubscribe;
+};
+
+/**
+ * Toggle voting phase in realtime DB
+ */
+export const toggleVotingPhase = async (
+  sessionId: string,
+  votingPhase: boolean
+): Promise<void> => {
+  const votingRef = ref(realtimeDb, `sessions/${sessionId}/votingPhase`);
+  await set(votingRef, votingPhase);
+};
+
+/**
+ * Subscribe to voting phase status
+ */
+export const subscribeToVotingPhase = (
+  sessionId: string,
+  callback: (votingPhase: boolean) => void
+): (() => void) => {
+  const votingRef = ref(realtimeDb, `sessions/${sessionId}/votingPhase`);
+  
+  const handleValueChange = (snapshot: DataSnapshot) => {
+    const isVoting = snapshot.val();
+    callback(isVoting === true);
+  };
+  
+  onValue(votingRef, handleValueChange);
+  
+  return () => off(votingRef, 'value', handleValueChange);
+};
+
+/**
+ * Vote for a sticky note
+ */
+export const toggleVoteForStickyNote = async (
+  sessionId: string,
+  noteId: string,
+  userId: string
+): Promise<void> => {
+  // Get current votes first
+  const votesRef = ref(realtimeDb, `stickyNotes/${sessionId}/${noteId}/votes`);
+  const votesSnapshot = await get(votesRef);
+  const votes = votesSnapshot.val() || {};
+  
+  // Toggle the vote (add or remove)
+  if (votes[userId]) {
+    votes[userId] = null;
+  } else {
+    votes[userId] = true;
+  }
+  
+  // Update the votes
+  await set(votesRef, votes);
 }; 

@@ -6,10 +6,10 @@ import UserList from '../components/UserList';
 import Whiteboard from '../components/Whiteboard';
 import Icebreaker from '../components/Icebreaker';
 import Timer from '../components/Timer';
-import { Copy, EyeOff } from 'lucide-react';
+import { Copy, EyeOff, ThumbsUp } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
-import { subscribeToSessionRevealed, toggleSessionReveal, subscribeToIcebreakerState } from '../services/realtimeDbService';
+import { subscribeToSessionRevealed, toggleSessionReveal, subscribeToIcebreakerState, subscribeToVotingPhase } from '../services/realtimeDbService';
 import { USER_SESSION_KEY } from '../constants';
 
 // Key for storing retrospective started status in localStorage
@@ -21,6 +21,7 @@ function Session() {
   const [sessionBasicInfo, setSessionBasicInfo] = useState<{id: string, createdAt: number, users: Record<string, User>} | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
+  const [isVotingPhase, setIsVotingPhase] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
   const [icebreakerCompleted, setIcebreakerCompleted] = useState(false);
@@ -82,6 +83,15 @@ function Session() {
       }
     );
 
+    // Subscribe to voting phase status
+    const unsubscribeVoting = subscribeToVotingPhase(
+      sessionId,
+      (votingPhaseStatus) => {
+        console.log('Received voting phase update:', votingPhaseStatus);
+        setIsVotingPhase(votingPhaseStatus);
+      }
+    );
+
     // Subscribe to icebreaker state to detect when retrospective is started
     const unsubscribeIcebreaker = subscribeToIcebreakerState(
       sessionId,
@@ -99,6 +109,7 @@ function Session() {
       unsubscribeBasicInfo();
       unsubscribeRevealed();
       unsubscribeIcebreaker();
+      unsubscribeVoting();
     };
   }, [sessionId, navigate]);
 
@@ -240,6 +251,12 @@ function Session() {
                 <span>Notes are hidden</span>
               </div>
             )}
+            {isVotingPhase && (
+              <div className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium ml-2">
+                <ThumbsUp className="w-4 h-4" />
+                <span>Voting in progress</span>
+              </div>
+            )}
           </div>
           
           {currentUser?.isCreator && (
@@ -270,6 +287,7 @@ function Session() {
             users={sessionBasicInfo.users}
             isRevealed={isRevealed}
             onToggleReveal={currentUser.isCreator ? handleToggleReveal : undefined}
+            isVotingPhase={isVotingPhase}
           />
         )}
       </div>

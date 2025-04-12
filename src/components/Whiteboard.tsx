@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X } from 'lucide-react';
+import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import { nanoid } from 'nanoid';
 import { 
@@ -13,7 +13,9 @@ import {
   initializeColumns,
   addColumn,
   updateColumn,
-  deleteColumn
+  deleteColumn,
+  toggleVotingPhase,
+  subscribeToVotingPhase
 } from '../services/realtimeDbService';
 
 interface WhiteboardProps {
@@ -22,6 +24,7 @@ interface WhiteboardProps {
   users: Record<string, User>;
   isRevealed?: boolean;
   onToggleReveal?: () => void;
+  isVotingPhase?: boolean;
 }
 
 // Add interface for cursor data
@@ -69,7 +72,7 @@ const AVAILABLE_COLORS = [
   'bg-teal-200'
 ];
 
-function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggleReveal }: WhiteboardProps) {
+function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggleReveal, isVotingPhase: externalVotingPhase }: WhiteboardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater>>();
   const [realtimeCursors, setRealtimeCursors] = useState<Record<string, CursorData>>({});
@@ -85,6 +88,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const lastPanPosition = useRef({ x: 0, y: 0 });
   const [boardDimensions, setBoardDimensions] = useState({ width: 0, height: 0 });
   const hasPannedRef = useRef<boolean>(false);
+  const [isVotingPhase, setIsVotingPhase] = useState(externalVotingPhase || false);
 
   // Memoized array of columns sorted by x position
   const columnsArray = useMemo(() => {
@@ -350,27 +354,40 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     }
   };
 
+  const handleToggleVotingPhase = async () => {
+    if (currentUser.isCreator) {
+      const newVotingPhase = !isVotingPhase;
+      setIsVotingPhase(newVotingPhase);
+      await toggleVotingPhase(sessionId, newVotingPhase);
+    }
+  };
+
   const handleAddNote = async (e: React.MouseEvent) => {
-    const rect = boardRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    // Calculate the mouse position relative to the board container
-    const viewportX = e.clientX - rect.left;
-    const viewportY = e.clientY - rect.top;
-
-    // Determine which column the note is being added to
-    const column = getNoteColumn({ x: viewportX, y: viewportY });
+    // Prevent adding notes during voting phase
+    if (isVotingPhase) return;
+    
+    // Get mouse position relative to the viewport
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    
+    // Adjust for current pan position
+    const adjustedX = mouseX - pan.x;
+    const adjustedY = mouseY - pan.y;
+    
+    // Determine which column the note belongs to
+    const column = getNoteColumn({ x: adjustedX, y: adjustedY });
     
     const noteId = nanoid();
-    const note = {
+    const note: StickyNote = {
       id: noteId,
       content: '',
       authorId: currentUser.id,
-      // Use viewport coordinates directly for sticky note position
-      position: { x: viewportX, y: viewportY },
-      color: column ? column.color : 'bg-yellow-200', // Default to yellow if no column
-      // Set to "other" category when outside of columns to avoid undefined error
-      columnId: column ? column.id : 'other'
+      position: {
+        x: adjustedX,
+        y: adjustedY
+      },
+      color: 'bg-yellow-100',
+      columnId: column?.id
     };
     
     await addStickyNote(sessionId, note);
@@ -446,6 +463,22 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     }
   };
 
+  // Subscribe to voting phase state
+  useEffect(() => {
+    const unsubscribe = subscribeToVotingPhase(sessionId, (votingPhase) => {
+      setIsVotingPhase(votingPhase);
+    });
+    
+    return () => unsubscribe();
+  }, [sessionId]);
+
+  // Update voting phase when prop changes
+  useEffect(() => {
+    if (externalVotingPhase !== undefined) {
+      setIsVotingPhase(externalVotingPhase);
+    }
+  }, [externalVotingPhase]);
+
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Whiteboard */}
@@ -470,7 +503,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
             <span className="text-sm font-medium">Center</span>
           </button>
           
-          {currentUser.isCreator && (
+          {currentUser.isCreator && !isVotingPhase && (
             <button
               onClick={handleAddColumn}
               className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
@@ -492,7 +525,24 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                 {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 <span className="text-sm font-medium">{isRevealed ? "Hide" : "Show"}</span>
               </button>
+              
+              <div className="h-8 w-px bg-gray-200 mx-1"></div>
+              <button
+                onClick={handleToggleVotingPhase}
+                className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center gap-1.5 transition-colors`}
+                title={isVotingPhase ? "End Voting" : "Start Voting"}
+              >
+                <ThumbsUp className="w-4 h-4" />
+                <span className="text-sm font-medium">{isVotingPhase ? "End Voting" : "Start Voting"}</span>
+              </button>
             </>
+          )}
+          
+          {!currentUser.isCreator && isVotingPhase && (
+            <div className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium">
+              <ThumbsUp className="w-4 h-4" />
+              <span>Voting in progress</span>
+            </div>
           )}
         </div>
 
@@ -649,6 +699,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
               currentUser={currentUser}
               isRevealed={isRevealed}
               author={users[note.authorId]}
+              isVotingPhase={isVotingPhase}
             />
           ))}
         </div>

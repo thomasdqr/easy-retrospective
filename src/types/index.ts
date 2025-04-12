@@ -15,6 +15,7 @@ export interface StickyNote {
   };
   color: string;
   columnId?: string;
+  votes?: Record<string, boolean>;
 }
 
 export interface Column {
@@ -31,4 +32,9 @@ export interface SessionBasicInfo {
   id: string;
   createdAt: number;
   users: Record<string, User>;
+}
+
+export interface SessionState {
+  isRevealed: boolean;
+  votingPhase: boolean;
 }
