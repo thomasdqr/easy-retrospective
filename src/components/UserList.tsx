@@ -32,7 +32,7 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
               <img
                 src={user.avatar}
                 alt={user.name}
-                className="w-8 h-8 rounded-full"
+                className="w-8 h-8 rounded-full bg-gray-100"
               />
               <div>
                 <p className="text-sm font-medium text-gray-900">{user.name}</p>

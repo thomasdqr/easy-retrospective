@@ -1130,7 +1130,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
               <img
                 src={user.avatar}
                 alt={user.name}
-                className="w-8 h-8 rounded-full border-2 border-white shadow-md"
+                className="w-8 h-8 rounded-full border-2 border-white shadow-md bg-gray-100"
               />
               <span
                 className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap"
