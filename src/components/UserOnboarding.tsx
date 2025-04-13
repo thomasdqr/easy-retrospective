@@ -1,16 +1,29 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createAvatar } from '@dicebear/core';
-import { lorelei, avataaars, bottts, micah, personas, adventurer } from '@dicebear/collection';
+import { lorelei } from '@dicebear/collection';
 import { User } from '../types';
-import { RefreshCw, Sliders, Shuffle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sliders, Shuffle, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface UserOnboardingProps {
   onComplete: (user: Omit<User, 'id'>) => void;
   isCreator?: boolean;
 }
 
-// Type for available avatar styles
-type AvatarStyle = 'lorelei' | 'avataaars' | 'bottts' | 'micah' | 'personas' | 'adventurer';
+// Avatar customization interface for localStorage
+interface AvatarCustomization {
+  seed: string;
+  hairColor: string;
+  skinColor: string;
+  hairStyle: string | null;
+  eyes: string | null;
+  mouth: string | null;
+  glasses: boolean;
+  beard: boolean;
+  earrings: boolean;
+}
+
+// localStorage key for avatar customization
+const AVATAR_CUSTOMIZATION_KEY = 'avatar_customization';
 
 // Hair color options
 const HAIR_COLORS = [
@@ -33,11 +46,18 @@ const SKIN_COLORS = [
   { name: 'Dark', value: '8d5524' },
 ];
 
+// Lorelei style options
+const HAIR_STYLES = Array.from({ length: 48 }, (_, i) => `variant${String(i + 1).padStart(2, '0')}`);
+const EYE_STYLES = Array.from({ length: 24 }, (_, i) => `variant${String(i + 1).padStart(2, '0')}`);
+const MOUTH_STYLES = [
+  ...Array.from({ length: 18 }, (_, i) => `happy${String(i + 1).padStart(2, '0')}`),
+  ...Array.from({ length: 9 }, (_, i) => `sad${String(i + 1).padStart(2, '0')}`)
+];
+
 function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) {
   const [name, setName] = useState('');
   const [seed, setSeed] = useState(() => Math.random().toString(36).substring(7));
   const [showCustomization, setShowCustomization] = useState(false);
-  const [selectedStyle, setSelectedStyle] = useState<AvatarStyle>('lorelei');
   
   // Customization options
   const [hairColor, setHairColor] = useState(HAIR_COLORS[0].value);
@@ -48,193 +68,131 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
   const [glasses, setGlasses] = useState(false);
   const [beard, setBeard] = useState(false);
   const [earrings, setEarrings] = useState(false);
+  
+  // Flag to prevent localStorage save on initial load
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  // Style-specific options based on the selected avatar style
-  const styleOptions = useMemo(() => {
-    switch (selectedStyle) {
-      case 'lorelei':
-        return {
-          hairStyles: Array.from({ length: 48 }, (_, i) => `variant${String(i + 1).padStart(2, '0')}`),
-          eyeStyles: Array.from({ length: 24 }, (_, i) => `variant${String(i + 1).padStart(2, '0')}`),
-          mouthStyles: [
-            ...Array.from({ length: 18 }, (_, i) => `happy${String(i + 1).padStart(2, '0')}`),
-            ...Array.from({ length: 9 }, (_, i) => `sad${String(i + 1).padStart(2, '0')}`)
-          ],
-          hasGlasses: true,
-          hasBeard: true,
-          hasEarrings: true,
-        };
-      case 'avataaars':
-        return {
-          hairStyles: ['longHair', 'shortHair', 'eyepatch', 'hat', 'hijab', 'turban'],
-          eyeStyles: ['default', 'eyeRoll', 'happy', 'side', 'squint', 'surprised', 'wink', 'winkWacky'],
-          mouthStyles: ['default', 'eating', 'grimace', 'sad', 'screamOpen', 'serious', 'smile', 'tongue', 'twinkle'],
-          hasGlasses: true,
-          hasBeard: true,
-          hasEarrings: false,
-        };
-      case 'bottts':
-        return {
-          hairStyles: ['antenna01', 'antenna02', 'cables01', 'cables02', 'round', 'square'],
-          eyeStyles: ['bulging', 'dizzy', 'eva', 'frame1', 'frame2', 'glow', 'happy', 'hearts', 'robocop', 'round', 'roundFrame01', 'roundFrame02', 'sensor', 'shade01'],
-          mouthStyles: ['bite', 'diagram', 'grill01', 'grill02', 'grill03', 'smile01', 'smile02', 'square01', 'square02'],
-          hasGlasses: false,
-          hasBeard: false,
-          hasEarrings: false,
-        };
-      case 'micah':
-        return {
-          hairStyles: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05'],
-          eyeStyles: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05'],
-          mouthStyles: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05'],
-          hasGlasses: true,
-          hasBeard: false,
-          hasEarrings: true,
-        };
-      case 'personas':
-        return {
-          hairStyles: ['short01', 'short02', 'short03', 'short04', 'short05', 'long01', 'long02', 'long03', 'long04'],
-          eyeStyles: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05'],
-          mouthStyles: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05'],
-          hasGlasses: true,
-          hasBeard: true,
-          hasEarrings: true,
-        };
-      case 'adventurer':
-        return {
-          hairStyles: ['short01', 'short02', 'short03', 'long01', 'long02', 'long03', 'bald'],
-          eyeStyles: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05'],
-          mouthStyles: ['variant01', 'variant02', 'variant03', 'variant04', 'variant05'],
-          hasGlasses: true,
-          hasBeard: true,
-          hasEarrings: true,
-        };
-      default:
-        return {
-          hairStyles: [],
-          eyeStyles: [],
-          mouthStyles: [],
-          hasGlasses: false,
-          hasBeard: false,
-          hasEarrings: false,
-        };
+  // Load saved avatar customization from localStorage on initial render
+  useEffect(() => {
+    try {
+      const savedCustomization = localStorage.getItem(AVATAR_CUSTOMIZATION_KEY);
+      if (savedCustomization) {
+        const customization: AvatarCustomization = JSON.parse(savedCustomization);
+        
+        setSeed(customization.seed);
+        setHairColor(customization.hairColor);
+        setSkinColor(customization.skinColor);
+        setHairStyle(customization.hairStyle);
+        setEyes(customization.eyes);
+        setMouth(customization.mouth);
+        setGlasses(customization.glasses);
+        setBeard(customization.beard);
+        setEarrings(customization.earrings);
+        
+        // Don't show customization panel by default, even with saved settings
+      }
+      
+      // Mark initial load as complete after setting state
+      setInitialLoadComplete(true);
+    } catch (error) {
+      console.error('Error loading avatar customization from localStorage:', error);
+      // If there's an error, we'll just use the default random avatar
+      setInitialLoadComplete(true);
     }
-  }, [selectedStyle]);
+  }, []);
+
+  // Save avatar customization to localStorage when options change, but only after initial load
+  useEffect(() => {
+    // Skip saving during the initial load to prevent render loops
+    if (!initialLoadComplete) return;
+    
+    const customization: AvatarCustomization = {
+      seed,
+      hairColor,
+      skinColor,
+      hairStyle,
+      eyes,
+      mouth,
+      glasses,
+      beard,
+      earrings
+    };
+    
+    localStorage.setItem(AVATAR_CUSTOMIZATION_KEY, JSON.stringify(customization));
+  }, [
+    initialLoadComplete,
+    seed,
+    hairColor,
+    skinColor,
+    hairStyle,
+    eyes,
+    mouth,
+    glasses,
+    beard,
+    earrings
+  ]);
 
   // Initialize random feature selections when style changes
-  useMemo(() => {
-    const randomHair = styleOptions.hairStyles[Math.floor(Math.random() * styleOptions.hairStyles.length)];
-    const randomEyes = styleOptions.eyeStyles[Math.floor(Math.random() * styleOptions.eyeStyles.length)];
-    const randomMouth = styleOptions.mouthStyles[Math.floor(Math.random() * styleOptions.mouthStyles.length)];
-    
-    setHairStyle(randomHair);
-    setEyes(randomEyes);
-    setMouth(randomMouth);
-    setGlasses(Math.random() > 0.7 && styleOptions.hasGlasses);
-    setBeard(Math.random() > 0.8 && styleOptions.hasBeard);
-    setEarrings(Math.random() > 0.9 && styleOptions.hasEarrings);
-  }, [selectedStyle, styleOptions]);
+  useEffect(() => {
+    // Only initialize if there's no saved customization or if hairStyle is null
+    if (initialLoadComplete && (!localStorage.getItem(AVATAR_CUSTOMIZATION_KEY) || hairStyle === null)) {
+      const randomHair = HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)];
+      const randomEyes = EYE_STYLES[Math.floor(Math.random() * EYE_STYLES.length)];
+      const randomMouth = MOUTH_STYLES[Math.floor(Math.random() * MOUTH_STYLES.length)];
+      
+      setHairStyle(randomHair);
+      setEyes(randomEyes);
+      setMouth(randomMouth);
+      setGlasses(Math.random() > 0.7);
+      setBeard(Math.random() > 0.8);
+      setEarrings(Math.random() > 0.9);
+    }
+  }, [hairStyle, initialLoadComplete]);
 
-  const generateAvatar = (seed: string) => {
-    let options = {
+  // Memoize avatar generation to prevent unnecessary re-renders
+  const generateAvatar = useCallback((seed: string) => {
+    // Type for avatar options allowing any property
+    type AvatarOptions = {
+      seed: string;
+      size: number;
+      [key: string]: unknown;
+    };
+    
+    let options: AvatarOptions = {
       seed,
       size: 128,
     };
     
     // Add style-specific customizations
-    if (showCustomization) {
-      switch (selectedStyle) {
-        case 'lorelei':
-          options = {
-            ...options,
-            hair: hairStyle ? [hairStyle] : undefined,
-            hairColor: [hairColor],
-            skinColor: [skinColor],
-            eyes: eyes ? [eyes] : undefined,
-            mouth: mouth ? [mouth] : undefined,
-            glasses: glasses ? ['variant01'] : [],
-            glassesProbability: glasses ? 100 : 0,
-            beard: beard ? ['variant01'] : [],
-            beardProbability: beard ? 100 : 0,
-            earrings: earrings ? ['variant01'] : [],
-            earringsProbability: earrings ? 100 : 0,
-          };
-          break;
-        case 'avataaars':
-          options = {
-            ...options,
-            hair: hairStyle ? [hairStyle] : undefined,
-            hairColor: [hairColor],
-            skinColor: [skinColor],
-            eyes: eyes ? [eyes] : undefined,
-            mouth: mouth ? [mouth] : undefined,
-            accessories: glasses ? ['kurt'] : [],
-            accessoriesProbability: glasses ? 100 : 0,
-            facialHair: beard ? ['medium'] : [],
-            facialHairProbability: beard ? 100 : 0,
-          };
-          break;
-        case 'bottts':
-          options = {
-            ...options,
-            head: hairStyle ? [hairStyle] : undefined,
-            eyes: eyes ? [eyes] : undefined,
-            mouth: mouth ? [mouth] : undefined,
-            colorful: true,
-          };
-          break;
-        case 'micah':
-        case 'personas':
-        case 'adventurer':
-          options = {
-            ...options,
-            hair: hairStyle ? [hairStyle] : undefined,
-            hairColor: [hairColor],
-            skinColor: [skinColor],
-            eyes: eyes ? [eyes] : undefined,
-            mouth: mouth ? [mouth] : undefined,
-            glasses: glasses ? ['variant01'] : [],
-            glassesProbability: glasses ? 100 : 0,
-            beard: beard && styleOptions.hasBeard ? ['variant01'] : [],
-            beardProbability: beard && styleOptions.hasBeard ? 100 : 0,
-            earrings: earrings && styleOptions.hasEarrings ? ['variant01'] : [],
-            earringsProbability: earrings && styleOptions.hasEarrings ? 100 : 0,
-          };
-          break;
-      }
+    if (hairStyle || hairColor || skinColor || eyes || mouth || glasses || beard || earrings) {
+      options = {
+        ...options,
+        hair: hairStyle ? [hairStyle] : undefined,
+        hairColor: [hairColor],
+        skinColor: [skinColor],
+        eyes: eyes ? [eyes] : undefined,
+        mouth: mouth ? [mouth] : undefined,
+        glasses: glasses ? ['variant01'] : [],
+        glassesProbability: glasses ? 100 : 0,
+        beard: beard ? ['variant01'] : [],
+        beardProbability: beard ? 100 : 0,
+        earrings: earrings ? ['variant01'] : [],
+        earringsProbability: earrings ? 100 : 0,
+      };
     }
 
-    // Create avatar based on selected style
-    let avatar;
-    switch (selectedStyle) {
-      case 'lorelei':
-        avatar = createAvatar(lorelei, options);
-        break;
-      case 'avataaars':
-        avatar = createAvatar(avataaars, options);
-        break;
-      case 'bottts':
-        avatar = createAvatar(bottts, options);
-        break;
-      case 'micah':
-        avatar = createAvatar(micah, options);
-        break;
-      case 'personas':
-        avatar = createAvatar(personas, options);
-        break;
-      case 'adventurer':
-        avatar = createAvatar(adventurer, options);
-        break;
-      default:
-        avatar = createAvatar(lorelei, options);
-    }
-    
+    const avatar = createAvatar(lorelei, options);
     return avatar.toDataUriSync();
-  };
-
-  const regenerateAvatar = () => {
-    setSeed(Math.random().toString(36).substring(7));
-  };
+  }, [
+    hairStyle, 
+    hairColor, 
+    skinColor, 
+    eyes, 
+    mouth, 
+    glasses, 
+    beard, 
+    earrings
+  ]);
 
   const randomizeAllFeatures = () => {
     // Set a new random seed
@@ -244,16 +202,16 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
     setHairColor(HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)].value);
     setSkinColor(SKIN_COLORS[Math.floor(Math.random() * SKIN_COLORS.length)].value);
     
-    const randomHair = styleOptions.hairStyles[Math.floor(Math.random() * styleOptions.hairStyles.length)];
-    const randomEyes = styleOptions.eyeStyles[Math.floor(Math.random() * styleOptions.eyeStyles.length)];
-    const randomMouth = styleOptions.mouthStyles[Math.floor(Math.random() * styleOptions.mouthStyles.length)];
+    const randomHair = HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)];
+    const randomEyes = EYE_STYLES[Math.floor(Math.random() * EYE_STYLES.length)];
+    const randomMouth = MOUTH_STYLES[Math.floor(Math.random() * MOUTH_STYLES.length)];
     
     setHairStyle(randomHair);
     setEyes(randomEyes);
     setMouth(randomMouth);
-    setGlasses(Math.random() > 0.7 && styleOptions.hasGlasses);
-    setBeard(Math.random() > 0.8 && styleOptions.hasBeard);
-    setEarrings(Math.random() > 0.9 && styleOptions.hasEarrings);
+    setGlasses(Math.random() > 0.7);
+    setBeard(Math.random() > 0.8);
+    setEarrings(Math.random() > 0.9);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -265,6 +223,12 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
         isCreator
       });
     }
+  };
+
+  // Function to reset avatar customization
+  const resetAvatarCustomization = () => {
+    localStorage.removeItem(AVATAR_CUSTOMIZATION_KEY);
+    randomizeAllFeatures();
   };
 
   return (
@@ -305,6 +269,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                   type="button"
                   onClick={randomizeAllFeatures}
                   className="flex items-center gap-1 py-1 px-2 rounded-md text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                  title="Generate random avatar"
                 >
                   <Shuffle className="w-3 h-3" />
                   Random
@@ -328,25 +293,6 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                 className="w-32 h-32 rounded-full bg-white shadow-sm"
               />
               
-              {/* Style selector */}
-              <div className="w-full">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Avatar Style
-                </label>
-                <select
-                  value={selectedStyle}
-                  onChange={(e) => setSelectedStyle(e.target.value as AvatarStyle)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                >
-                  <option value="lorelei">Lorelei</option>
-                  <option value="avataaars">Avataaars</option>
-                  <option value="bottts">Bottts (Robot)</option>
-                  <option value="micah">Micah</option>
-                  <option value="personas">Personas</option>
-                  <option value="adventurer">Adventurer</option>
-                </select>
-              </div>
-              
               {/* Customization options */}
               {showCustomization && (
                 <div className="w-full space-y-4 mt-2">
@@ -360,7 +306,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                       onChange={(e) => setHairStyle(e.target.value)}
                       className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                     >
-                      {styleOptions.hairStyles.map((style) => (
+                      {HAIR_STYLES.map((style) => (
                         <option key={style} value={style}>
                           {style}
                         </option>
@@ -368,47 +314,43 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                     </select>
                   </div>
                   
-                  {/* Hair color (for styles that support it) */}
-                  {selectedStyle !== 'bottts' && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Hair Color
-                      </label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {HAIR_COLORS.map((color) => (
-                          <button
-                            key={color.value}
-                            type="button"
-                            className={`w-full h-8 rounded-md border ${hairColor === color.value ? 'ring-2 ring-indigo-500' : 'border-gray-300'}`}
-                            style={{ backgroundColor: `#${color.value}` }}
-                            onClick={() => setHairColor(color.value)}
-                            title={color.name}
-                          />
-                        ))}
-                      </div>
+                  {/* Hair color */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Hair Color
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {HAIR_COLORS.map((color) => (
+                        <button
+                          key={color.value}
+                          type="button"
+                          className={`w-full h-8 rounded-md border ${hairColor === color.value ? 'ring-2 ring-indigo-500' : 'border-gray-300'}`}
+                          style={{ backgroundColor: `#${color.value}` }}
+                          onClick={() => setHairColor(color.value)}
+                          title={color.name}
+                        />
+                      ))}
                     </div>
-                  )}
+                  </div>
                   
-                  {/* Skin color (for styles that support it) */}
-                  {selectedStyle !== 'bottts' && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Skin Color
-                      </label>
-                      <div className="grid grid-cols-5 gap-2">
-                        {SKIN_COLORS.map((color) => (
-                          <button
-                            key={color.value}
-                            type="button"
-                            className={`w-full h-8 rounded-md border ${skinColor === color.value ? 'ring-2 ring-indigo-500' : 'border-gray-300'}`}
-                            style={{ backgroundColor: `#${color.value}` }}
-                            onClick={() => setSkinColor(color.value)}
-                            title={color.name}
-                          />
-                        ))}
-                      </div>
+                  {/* Skin color */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Skin Color
+                    </label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {SKIN_COLORS.map((color) => (
+                        <button
+                          key={color.value}
+                          type="button"
+                          className={`w-full h-8 rounded-md border ${skinColor === color.value ? 'ring-2 ring-indigo-500' : 'border-gray-300'}`}
+                          style={{ backgroundColor: `#${color.value}` }}
+                          onClick={() => setSkinColor(color.value)}
+                          title={color.name}
+                        />
+                      ))}
                     </div>
-                  )}
+                  </div>
                   
                   {/* Eyes */}
                   <div>
@@ -420,7 +362,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                       onChange={(e) => setEyes(e.target.value)}
                       className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                     >
-                      {styleOptions.eyeStyles.map((style) => (
+                      {EYE_STYLES.map((style) => (
                         <option key={style} value={style}>
                           {style}
                         </option>
@@ -438,7 +380,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                       onChange={(e) => setMouth(e.target.value)}
                       className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                     >
-                      {styleOptions.mouthStyles.map((style) => (
+                      {MOUTH_STYLES.map((style) => (
                         <option key={style} value={style}>
                           {style}
                         </option>
@@ -448,41 +390,35 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                   
                   {/* Feature toggles */}
                   <div className="flex flex-wrap gap-4">
-                    {styleOptions.hasGlasses && (
-                      <label className="flex items-center text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={glasses}
-                          onChange={() => setGlasses(!glasses)}
-                          className="mr-2 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                        />
-                        Glasses
-                      </label>
-                    )}
+                    <label className="flex items-center text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={glasses}
+                        onChange={() => setGlasses(!glasses)}
+                        className="mr-2 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      />
+                      Glasses
+                    </label>
                     
-                    {styleOptions.hasBeard && (
-                      <label className="flex items-center text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={beard}
-                          onChange={() => setBeard(!beard)}
-                          className="mr-2 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                        />
-                        Beard
-                      </label>
-                    )}
+                    <label className="flex items-center text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={beard}
+                        onChange={() => setBeard(!beard)}
+                        className="mr-2 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      />
+                      Beard
+                    </label>
                     
-                    {styleOptions.hasEarrings && (
-                      <label className="flex items-center text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={earrings}
-                          onChange={() => setEarrings(!earrings)}
-                          className="mr-2 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                        />
-                        Earrings
-                      </label>
-                    )}
+                    <label className="flex items-center text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={earrings}
+                        onChange={() => setEarrings(!earrings)}
+                        className="mr-2 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      />
+                      Earrings
+                    </label>
                   </div>
                 </div>
               )}
