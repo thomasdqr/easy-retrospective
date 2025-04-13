@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import { User } from '../types';
-import { Sliders, Shuffle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sliders, Shuffle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface UserOnboardingProps {
   onComplete: (user: Omit<User, 'id'>) => void;
@@ -28,22 +28,39 @@ const AVATAR_CUSTOMIZATION_KEY = 'avatar_customization';
 // Hair color options
 const HAIR_COLORS = [
   { name: 'Black', value: '000000' },
+  { name: 'Dark Brown', value: '3b271d' },
   { name: 'Brown', value: '6b4f3f' },
+  { name: 'Light Brown', value: '9a7b4f' },
+  { name: 'Dark Blonde', value: 'c89b56' },
   { name: 'Blonde', value: 'e0bb94' },
-  { name: 'Red', value: 'a52f10' },
+  { name: 'Dark Red', value: '631c18' },
+  { name: 'Auburn', value: 'b75035' },
+  { name: 'Ginger', value: 'e06c3a' },
   { name: 'Gray', value: 'aaaaaa' },
-  { name: 'Blue', value: '1e00ff' },
-  { name: 'Pink', value: 'ff00e3' },
-  { name: 'Green', value: '00ff85' },
+  { name: 'Silver', value: 'd4d4d4' },
+  { name: 'White', value: 'ffffff' },
+  { name: 'Lime Green', value: '7fff00' },
+  { name: 'Turquoise', value: '40e0d0' },
+  { name: 'Electric Blue', value: '00b2ff' },
+  { name: 'Neon Purple', value: 'b700ff' },
+  { name: 'Magenta', value: 'ff00ff' },
+  { name: 'Hot Pink', value: 'ff1493' },
 ];
 
 // Skin color options
 const SKIN_COLORS = [
+  { name: 'White', value: 'ffffff' },
+  { name: 'Pale', value: 'ffe9d6' },
   { name: 'Light', value: 'ffdbac' },
   { name: 'Medium', value: 'f1c27d' },
+  { name: 'Medium Tan', value: 'eac086' },
   { name: 'Tan', value: 'e0ac69' },
+  { name: 'Light Brown', value: 'd19c5a' },
   { name: 'Brown', value: 'c68642' },
+  { name: 'Dark Brown', value: 'a56b36' },
   { name: 'Dark', value: '8d5524' },
+  { name: 'Very Dark', value: '603311' },
+  { name: 'Ebony', value: '412307' },
 ];
 
 // Lorelei style options
@@ -62,15 +79,45 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
   // Customization options
   const [hairColor, setHairColor] = useState(HAIR_COLORS[0].value);
   const [skinColor, setSkinColor] = useState(SKIN_COLORS[0].value);
-  const [hairStyle, setHairStyle] = useState<string | null>(null);
-  const [eyes, setEyes] = useState<string | null>(null);
-  const [mouth, setMouth] = useState<string | null>(null);
+  const [hairStyleIndex, setHairStyleIndex] = useState(0);
+  const [eyesIndex, setEyesIndex] = useState(0);
+  const [mouthIndex, setMouthIndex] = useState(0);
   const [glasses, setGlasses] = useState(false);
   const [beard, setBeard] = useState(false);
   const [earrings, setEarrings] = useState(false);
   
   // Flag to prevent localStorage save on initial load
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  // Get the actual style values from the indices
+  const hairStyle = HAIR_STYLES[hairStyleIndex];
+  const eyes = EYE_STYLES[eyesIndex];
+  const mouth = MOUTH_STYLES[mouthIndex];
+
+  // Navigation functions for styles
+  const nextHairStyle = () => {
+    setHairStyleIndex((prev) => (prev + 1) % HAIR_STYLES.length);
+  };
+
+  const prevHairStyle = () => {
+    setHairStyleIndex((prev) => (prev - 1 + HAIR_STYLES.length) % HAIR_STYLES.length);
+  };
+
+  const nextEyeStyle = () => {
+    setEyesIndex((prev) => (prev + 1) % EYE_STYLES.length);
+  };
+
+  const prevEyeStyle = () => {
+    setEyesIndex((prev) => (prev - 1 + EYE_STYLES.length) % EYE_STYLES.length);
+  };
+
+  const nextMouthStyle = () => {
+    setMouthIndex((prev) => (prev + 1) % MOUTH_STYLES.length);
+  };
+
+  const prevMouthStyle = () => {
+    setMouthIndex((prev) => (prev - 1 + MOUTH_STYLES.length) % MOUTH_STYLES.length);
+  };
 
   // Load saved avatar customization from localStorage on initial render
   useEffect(() => {
@@ -82,9 +129,17 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
         setSeed(customization.seed);
         setHairColor(customization.hairColor);
         setSkinColor(customization.skinColor);
-        setHairStyle(customization.hairStyle);
-        setEyes(customization.eyes);
-        setMouth(customization.mouth);
+        
+        // Find indices for the saved styles
+        const savedHairStyleIndex = HAIR_STYLES.findIndex(style => style === customization.hairStyle);
+        const savedEyesIndex = EYE_STYLES.findIndex(style => style === customization.eyes);
+        const savedMouthIndex = MOUTH_STYLES.findIndex(style => style === customization.mouth);
+        
+        // Set the style indices (defaulting to 0 if not found)
+        setHairStyleIndex(savedHairStyleIndex >= 0 ? savedHairStyleIndex : 0);
+        setEyesIndex(savedEyesIndex >= 0 ? savedEyesIndex : 0);
+        setMouthIndex(savedMouthIndex >= 0 ? savedMouthIndex : 0);
+        
         setGlasses(customization.glasses);
         setBeard(customization.beard);
         setEarrings(customization.earrings);
@@ -132,22 +187,31 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
     earrings
   ]);
 
-  // Initialize random feature selections when style changes
+  // Initialize random feature selections when needed
   useEffect(() => {
-    // Only initialize if there's no saved customization or if hairStyle is null
-    if (initialLoadComplete && (!localStorage.getItem(AVATAR_CUSTOMIZATION_KEY) || hairStyle === null)) {
-      const randomHair = HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)];
-      const randomEyes = EYE_STYLES[Math.floor(Math.random() * EYE_STYLES.length)];
-      const randomMouth = MOUTH_STYLES[Math.floor(Math.random() * MOUTH_STYLES.length)];
+    // Only initialize if there's no saved customization and initial load is complete
+    if (initialLoadComplete && !localStorage.getItem(AVATAR_CUSTOMIZATION_KEY)) {
+      // Random indices for styles
+      const randomHairIndex = Math.floor(Math.random() * HAIR_STYLES.length);
+      const randomEyesIndex = Math.floor(Math.random() * EYE_STYLES.length);
+      const randomMouthIndex = Math.floor(Math.random() * MOUTH_STYLES.length);
       
-      setHairStyle(randomHair);
-      setEyes(randomEyes);
-      setMouth(randomMouth);
+      setHairStyleIndex(randomHairIndex);
+      setEyesIndex(randomEyesIndex);
+      setMouthIndex(randomMouthIndex);
+      
+      // Random colors
+      const randomHairColorIndex = Math.floor(Math.random() * HAIR_COLORS.length);
+      const randomSkinColorIndex = Math.floor(Math.random() * SKIN_COLORS.length);
+      
+      setHairColor(HAIR_COLORS[randomHairColorIndex].value);
+      setSkinColor(SKIN_COLORS[randomSkinColorIndex].value);
+      
       setGlasses(Math.random() > 0.7);
       setBeard(Math.random() > 0.8);
       setEarrings(Math.random() > 0.9);
     }
-  }, [hairStyle, initialLoadComplete]);
+  }, [initialLoadComplete]);
 
   // Memoize avatar generation to prevent unnecessary re-renders
   const generateAvatar = useCallback((seed: string) => {
@@ -163,23 +227,21 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
       size: 128,
     };
     
-    // Add style-specific customizations
-    if (hairStyle || hairColor || skinColor || eyes || mouth || glasses || beard || earrings) {
-      options = {
-        ...options,
-        hair: hairStyle ? [hairStyle] : undefined,
-        hairColor: [hairColor],
-        skinColor: [skinColor],
-        eyes: eyes ? [eyes] : undefined,
-        mouth: mouth ? [mouth] : undefined,
-        glasses: glasses ? ['variant01'] : [],
-        glassesProbability: glasses ? 100 : 0,
-        beard: beard ? ['variant01'] : [],
-        beardProbability: beard ? 100 : 0,
-        earrings: earrings ? ['variant01'] : [],
-        earringsProbability: earrings ? 100 : 0,
-      };
-    }
+    // Add customizations
+    options = {
+      ...options,
+      hair: [hairStyle],
+      hairColor: [hairColor],
+      skinColor: [skinColor],
+      eyes: [eyes],
+      mouth: [mouth],
+      glasses: glasses ? ['variant01'] : [],
+      glassesProbability: glasses ? 100 : 0,
+      beard: beard ? ['variant01'] : [],
+      beardProbability: beard ? 100 : 0,
+      earrings: earrings ? ['variant01'] : [],
+      earringsProbability: earrings ? 100 : 0,
+    };
 
     const avatar = createAvatar(lorelei, options);
     return avatar.toDataUriSync();
@@ -199,16 +261,20 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
     setSeed(Math.random().toString(36).substring(7));
     
     // Randomize all features
-    setHairColor(HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)].value);
-    setSkinColor(SKIN_COLORS[Math.floor(Math.random() * SKIN_COLORS.length)].value);
+    const randomHairColorIndex = Math.floor(Math.random() * HAIR_COLORS.length);
+    const randomSkinColorIndex = Math.floor(Math.random() * SKIN_COLORS.length);
+    setHairColor(HAIR_COLORS[randomHairColorIndex].value);
+    setSkinColor(SKIN_COLORS[randomSkinColorIndex].value);
     
-    const randomHair = HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)];
-    const randomEyes = EYE_STYLES[Math.floor(Math.random() * EYE_STYLES.length)];
-    const randomMouth = MOUTH_STYLES[Math.floor(Math.random() * MOUTH_STYLES.length)];
+    // Random indices for styles
+    const randomHairIndex = Math.floor(Math.random() * HAIR_STYLES.length);
+    const randomEyesIndex = Math.floor(Math.random() * EYE_STYLES.length);
+    const randomMouthIndex = Math.floor(Math.random() * MOUTH_STYLES.length);
     
-    setHairStyle(randomHair);
-    setEyes(randomEyes);
-    setMouth(randomMouth);
+    setHairStyleIndex(randomHairIndex);
+    setEyesIndex(randomEyesIndex);
+    setMouthIndex(randomMouthIndex);
+    
     setGlasses(Math.random() > 0.7);
     setBeard(Math.random() > 0.8);
     setEarrings(Math.random() > 0.9);
@@ -223,12 +289,6 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
         isCreator
       });
     }
-  };
-
-  // Function to reset avatar customization
-  const resetAvatarCustomization = () => {
-    localStorage.removeItem(AVATAR_CUSTOMIZATION_KEY);
-    randomizeAllFeatures();
   };
 
   return (
@@ -290,28 +350,43 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
               <img
                 src={generateAvatar(seed)}
                 alt="Avatar"
-                className="w-32 h-32 rounded-full bg-white shadow-sm"
+                className="w-32 h-32 rounded-full bg-gray-100 shadow-sm"
               />
               
               {/* Customization options */}
               {showCustomization && (
                 <div className="w-full space-y-4 mt-2">
-                  {/* Hair style */}
+                  {/* Hair style with navigation */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Hair Style
-                    </label>
-                    <select
-                      value={hairStyle || ''}
-                      onChange={(e) => setHairStyle(e.target.value)}
-                      className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                    >
-                      {HAIR_STYLES.map((style) => (
-                        <option key={style} value={style}>
-                          {style}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Hair Style
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        {hairStyleIndex + 1} / {HAIR_STYLES.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={prevHairStyle}
+                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-colors"
+                        title="Previous hair style"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <div className="flex-1 h-8 bg-gray-100 rounded-md flex items-center justify-center text-sm text-gray-600">
+                        {hairStyle}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={nextHairStyle}
+                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-colors"
+                        title="Next hair style"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Hair color */}
@@ -319,7 +394,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Hair Color
                     </label>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-6 gap-2">
                       {HAIR_COLORS.map((color) => (
                         <button
                           key={color.value}
@@ -338,7 +413,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Skin Color
                     </label>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-6 gap-2">
                       {SKIN_COLORS.map((color) => (
                         <button
                           key={color.value}
@@ -352,40 +427,70 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
                     </div>
                   </div>
                   
-                  {/* Eyes */}
+                  {/* Eyes with navigation */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Eyes
-                    </label>
-                    <select
-                      value={eyes || ''}
-                      onChange={(e) => setEyes(e.target.value)}
-                      className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                    >
-                      {EYE_STYLES.map((style) => (
-                        <option key={style} value={style}>
-                          {style}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Eyes
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        {eyesIndex + 1} / {EYE_STYLES.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={prevEyeStyle}
+                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-colors"
+                        title="Previous eye style"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <div className="flex-1 h-8 bg-gray-100 rounded-md flex items-center justify-center text-sm text-gray-600">
+                        {eyes}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={nextEyeStyle}
+                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-colors"
+                        title="Next eye style"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                   
-                  {/* Mouth */}
+                  {/* Mouth with navigation */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Mouth
-                    </label>
-                    <select
-                      value={mouth || ''}
-                      onChange={(e) => setMouth(e.target.value)}
-                      className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                    >
-                      {MOUTH_STYLES.map((style) => (
-                        <option key={style} value={style}>
-                          {style}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-medium text-gray-700">
+                        Mouth
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        {mouthIndex + 1} / {MOUTH_STYLES.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={prevMouthStyle}
+                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-colors"
+                        title="Previous mouth style"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <div className="flex-1 h-8 bg-gray-100 rounded-md flex items-center justify-center text-sm text-gray-600">
+                        {mouth}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={nextMouthStyle}
+                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 transition-colors"
+                        title="Next mouth style"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Feature toggles */}
