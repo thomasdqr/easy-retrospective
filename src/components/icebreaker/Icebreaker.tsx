@@ -378,6 +378,14 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
 
   return (
     <div className='flex flex-col items-center justify-center h-screen'>
+      <div className="absolute top-4 left-4">
+        <a href="/" className="flex items-center justify-center w-8 h-8 rounded-full bg-white/80 hover:bg-white shadow-sm text-indigo-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+        </a>
+      </div>
       <div className="max-w-4xl mx-auto flex flex-col items-center justify-center p-6 bg-white/80 rounded-lg shadow-lg min-w-[50vw] min-h-[50vh] mt-20 mb-4">
         <div className="w-full overflow-y-auto">
           <h2 className="text-2xl font-bold mb-6 text-indigo-800">Two Truths and a Lie</h2>

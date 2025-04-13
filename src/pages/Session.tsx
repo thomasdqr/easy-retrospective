@@ -202,7 +202,15 @@ function Session() {
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
         <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4">
           <div className="flex justify-between items-center mx-1">
-            <h1 className="text-2xl font-bold text-gray-900">Icebreaker</h1>
+            <div className="flex items-center">
+              <a href="/" className="flex items-center justify-center w-8 h-8 rounded-full mr-2 bg-white/80 hover:bg-white shadow-sm text-indigo-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+              </a>
+              <h1 className="text-2xl font-bold text-gray-900">Icebreaker</h1>
+            </div>
             {currentUser?.isCreator && (
               <div className="flex items-center">
                 <div className="bg-white border border-gray-300 rounded-l-md px-3 py-2 flex-1 text-sm text-gray-700 truncate max-w-[200px]">
@@ -267,7 +275,15 @@ function Session() {
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
       <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
         <div className="flex justify-between items-center mx-1">
-          <h1 className="text-2xl font-bold text-gray-900">Retrospective Board</h1>
+          <div className="flex items-center">
+            <a href="/" className="flex items-center justify-center w-8 h-8 rounded-full mr-2 bg-white/80 hover:bg-white shadow-sm text-indigo-600 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+              </svg>
+            </a>
+            <h1 className="text-2xl font-bold text-gray-900">Retrospective Board</h1>
+          </div>
           
           <div className="absolute left-1/2 -translate-x-1/2">
             {!isRevealed && (
