@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { PenLine } from 'lucide-react';
 import { createSession } from '../services/firebaseService';
+import { cleanupOldSessions } from '../services/sessionCleanupService';
 import { useState } from 'react';
 
 
@@ -15,6 +16,14 @@ function Home() {
     try {
       setIsCreating(true);
       const sessionId = nanoid(10);
+      
+      // Clean up old sessions before creating a new one
+      try {
+        await cleanupOldSessions();
+      } catch (cleanupError) {
+        console.error('Error cleaning up old sessions:', cleanupError);
+        // Continue with session creation even if cleanup fails
+      }
       
       console.log('Creating session with ID:', sessionId);
       const success = await createSession(sessionId);

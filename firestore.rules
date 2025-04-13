@@ -17,6 +17,9 @@ service cloud.firestore {
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users']) &&
                      request.resource.data.id == resource.data.id &&
                      request.resource.data.createdAt == resource.data.createdAt;
+      
+      // Allow deletion of sessions
+      allow delete: if true;
     }
     
     // Block access to any other collection

@@ -1,6 +1,8 @@
 {
   "rules": {
     "sessions": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         "isRevealed": {
           ".read": true,
@@ -41,6 +43,8 @@
       }
     },
     "columns": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         ".read": true,
         ".write": true,
@@ -50,8 +54,11 @@
       }
     },
     "stickyNotes": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         ".read": true,
+        ".write": true,
         "$noteId": {
           ".write": true,
           ".validate": "newData.hasChildren(['id', 'content', 'authorId', 'position', 'color']) && newData.child('id').isString() && newData.child('content').isString() && newData.child('authorId').isString() && newData.child('position').hasChildren(['x', 'y']) && newData.child('position/x').isNumber() && newData.child('position/y').isNumber() && newData.child('color').isString()",
@@ -66,8 +73,11 @@
       }
     },
     "notesPosition": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         ".read": true,
+        ".write": true,
         "$noteId": {
           ".write": true,
           ".validate": "newData.hasChildren(['x', 'y']) && newData.child('x').isNumber() && newData.child('y').isNumber()"
@@ -75,8 +85,11 @@
       }
     },
     "notesMoving": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         ".read": true,
+        ".write": true,
         "$noteId": {
           ".write": true,
           ".validate": "newData.isString() || newData.val() == null"
@@ -84,8 +97,11 @@
       }
     },
     "notesEditing": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         ".read": true,
+        ".write": true,
         "$noteId": {
           ".write": true,
           ".validate": "newData.isString() || newData.val() == null"
@@ -93,8 +109,11 @@
       }
     },
     "cursors": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         ".read": true,
+        ".write": true,
         "$userId": {
           ".write": true,
           ".validate": "newData.hasChildren(['x', 'y', 'lastUpdate']) && newData.child('x').isNumber() && newData.child('y').isNumber() && newData.child('lastUpdate').isNumber()"
@@ -102,6 +121,8 @@
       }
     },
     "drawings": {
+      ".read": true,
+      ".write": true,
       "$sessionId": {
         ".read": true,
         ".write": true,
