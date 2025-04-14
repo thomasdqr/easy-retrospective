@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
-import { PenLine } from 'lucide-react';
+import { History } from 'lucide-react';
 import { createSession } from '../services/firebaseService';
 import { cleanupOldSessions } from '../services/sessionCleanupService';
 import { useState } from 'react';
+import favicon from '../assets/favicon.png';
 
 
 function Home() {
@@ -45,16 +46,19 @@ function Home() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-100 to-purple-100">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+      <div className="max-w-2xl w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 bg-indigo-100 rounded-full flex items-center justify-center">
-            <PenLine className="h-6 w-6 text-indigo-600" />
+            <img src={favicon} alt="Favicon" className="h-6 w-6" />
           </div>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Retrospective Board
+            Easy Retrospective
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Create a session and invite your team to collaborate in real-time
+          <p className="font-semibold text-xl text-indigo-600 mt-1 whitespace-nowrap">
+            Grow Understanding, Explore Perspectives, Inspire Next.
+          </p>
+          <p className="mt-4 text-sm text-gray-600">
+            Start a new session and invite team members to collaborate on retrospectives in real-time, enhancing team communication and growth.
           </p>
         </div>
 
