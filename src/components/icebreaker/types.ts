@@ -12,7 +12,6 @@ export interface PlayerState {
     "1": Statement;
     "2": Statement;
   };
-  hasSubmitted: boolean;
   votes: Record<string, number>; // userId -> statementIndex voted as lie
   score?: number;
   statementOrder?: number[]; // Shuffled order of statements [0,1,2]

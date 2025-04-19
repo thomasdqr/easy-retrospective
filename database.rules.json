@@ -24,7 +24,7 @@
           ".write": true,
           "users": {
             "$userId": {
-              ".validate": "newData.hasChildren(['statements', 'hasSubmitted']) && newData.child('hasSubmitted').isBoolean() && newData.child('statements').hasChildren() && newData.child('statements').hasChildren(['0', '1', '2']) && newData.child('statements/0').hasChildren(['text', 'isLie', 'revealed']) && newData.child('statements/1').hasChildren(['text', 'isLie', 'revealed']) && newData.child('statements/2').hasChildren(['text', 'isLie', 'revealed'])"
+              ".validate": "newData.hasChildren(['statements']) && newData.child('statements').hasChildren() && newData.child('statements').hasChildren(['0', '1', '2']) && newData.child('statements/0').hasChildren(['text', 'isLie', 'revealed']) && newData.child('statements/1').hasChildren(['text', 'isLie', 'revealed']) && newData.child('statements/2').hasChildren(['text', 'isLie', 'revealed'])"
             }
           },
           "activeUser": {

@@ -5,6 +5,16 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({ users, gameState }) => {
   // Filter out any null or undefined users
   const validUsers = Object.entries(users).filter(([, user]) => user !== null && user !== undefined);
 
+  // Helper function to check if a user has submitted valid statements
+  const hasUserSubmitted = (userId: string): boolean => {
+    const userStatements = gameState.users[userId]?.statements;
+    if (!userStatements) return false;
+    
+    return Object.values(userStatements).every(statement => 
+      statement && statement.text && statement.text.trim().length > 0
+    );
+  };
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-lg text-center">
       <p className="text-gray-700 mb-4">
@@ -19,7 +29,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({ users, gameState }) => {
             <div>
               <p className="font-medium">{user.name}</p>
               <p className="text-sm text-gray-500">
-                {gameState.users[userId]?.hasSubmitted ? 'Submitted ✓' : 'Waiting...'}
+                {hasUserSubmitted(userId) ? 'Submitted ✓' : 'Waiting...'}
               </p>
             </div>
           </div>

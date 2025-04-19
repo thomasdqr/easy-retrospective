@@ -12,6 +12,10 @@ import ResultsNavigation from './ResultsNavigation';
 import RevealButton from './RevealButton';
 import Leaderboard from './Leaderboard';
 
+// Import firebase directly to add individual users
+import { ref, set } from 'firebase/database';
+import { realtimeDb } from '../../config/firebase';
+
 const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, onComplete }) => {
   const [statements, setStatements] = useState<Statement[]>([
     { text: '', isLie: false, revealed: false },
@@ -104,27 +108,41 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
     // Check if the user exists in the game state
     if (!gameState.users[currentUser.id]) {
       console.log("Initializing game state for rejoined user");
-      const updatedUsers = {
-        ...gameState.users,
-        [currentUser.id]: {
-          statements: {
-            "0": { text: '', isLie: false, revealed: false },
-            "1": { text: '', isLie: false, revealed: false },
-            "2": { text: '', isLie: true, revealed: false }
-          },
-          hasSubmitted: false,
-          votes: {},
-          score: 0,
-          statementOrder: shuffleArray([0, 1, 2])
-        }
+      
+      // Create the new user state
+      const newUserState = {
+        statements: {
+          "0": { text: '', isLie: false, revealed: false },
+          "1": { text: '', isLie: false, revealed: false },
+          "2": { text: '', isLie: true, revealed: false }
+        },
+        votes: {},
+        score: 0,
+        statementOrder: shuffleArray([0, 1, 2])
       };
 
-      const newState = {
-        ...gameState,
-        users: updatedUsers
-      };
-
-      updateIcebreakerState(sessionId, newState);
+      // Use Firebase to directly update just this user's data
+      const userRef = ref(realtimeDb, `sessions/${sessionId}/icebreaker/users/${currentUser.id}`);
+      set(userRef, newUserState)
+        .then(() => {
+          console.log("New user added successfully without changing other users' data");
+        })
+        .catch(error => {
+          console.error("Error adding new user:", error);
+          
+          // Fallback to the old method if direct update fails
+          const updatedUsers = {
+            ...gameState.users,
+            [currentUser.id]: newUserState
+          };
+          
+          const newState = {
+            ...gameState,
+            users: updatedUsers
+          };
+          
+          updateIcebreakerState(sessionId, newState);
+        });
     }
   }, [sessionId, currentUser, users, gameState.users]);
 
@@ -142,7 +160,6 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
           "1": statements[1],
           "2": statements[2]
         },
-        hasSubmitted: true,
         votes: {},
         score: 0,
         statementOrder: statementOrder
@@ -376,6 +393,16 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
     }
   };
 
+  // Helper function to check if the current user has submitted valid statements
+  const hasUserSubmitted = (userId: string): boolean => {
+    const userStatements = gameState.users[userId]?.statements;
+    if (!userStatements) return false;
+    
+    return Object.values(userStatements).every(statement => 
+      statement && statement.text && statement.text.trim().length > 0
+    );
+  };
+
   return (
     <div className='flex flex-col items-center justify-center h-screen'>
       <div className="absolute top-4 left-4">
@@ -403,7 +430,7 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
           ) : (
             <>
               {/* Statement submission phase */}
-              {!gameState.users[currentUser.id]?.hasSubmitted && (
+              {!hasUserSubmitted(currentUser.id) && (
                 <SubmissionForm 
                   statements={statements} 
                   setStatements={setStatements} 
@@ -412,12 +439,12 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
               )}
               
               {/* Waiting for others to submit */}
-              {gameState.users[currentUser.id]?.hasSubmitted && !allSubmitted && (
+              {hasUserSubmitted(currentUser.id) && !allSubmitted && (
                 <WaitingRoom users={users} gameState={gameState} />
               )}
               
-              {/* Voting Phase */}
-              {allSubmitted && !allVoted && !gameState.finalLeaderboard && (
+              {/* Voting Phase - Only show if the current user has submitted */}
+              {hasUserSubmitted(currentUser.id) && allSubmitted && !allVoted && !gameState.finalLeaderboard && (
                 <div className="space-y-8">
                   {/* Progress indicator */}
                   <div className="flex items-center justify-between mb-8">
@@ -450,8 +477,8 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
                 </div>
               )}
               
-              {/* Results Phase */}
-              {allSubmitted && allVoted && !gameState.finalLeaderboard && (
+              {/* Results Phase - Only show if the current user has submitted */}
+              {hasUserSubmitted(currentUser.id) && allSubmitted && allVoted && !gameState.finalLeaderboard && (
                 <div className="space-y-8">
                   {/* Navigation controls */}
                   <ResultsNavigation 

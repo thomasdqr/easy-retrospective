@@ -24,7 +24,6 @@ interface IcebreakerPlayerState {
     "1": IcebreakerStatement;
     "2": IcebreakerStatement;
   };
-  hasSubmitted: boolean;
   votes: Record<string, number>; // userId -> statementIndex voted as lie
   score?: number;
   statementOrder?: number[]; // Order of statements for this player (shuffled)
