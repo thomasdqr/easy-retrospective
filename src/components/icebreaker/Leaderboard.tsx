@@ -9,6 +9,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({
 }) => {
   // Get scores and sort users by score
   const scoreData = Object.entries(gameState.users)
+    .filter(([userId]) => userId && users[userId]) // Filter out users without a userId or not in users object
     .map(([userId, state]) => ({
       userId,
       name: users[userId]?.name || 'Unknown',
