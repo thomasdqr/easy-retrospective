@@ -1,4 +1,5 @@
-import { IcebreakerGameState, User } from './types';
+import { User } from '../../types';
+import { IcebreakerGameState } from './types';
 
 /**
  * Get list of valid (non-kicked) users
