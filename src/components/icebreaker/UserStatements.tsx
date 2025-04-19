@@ -65,7 +65,7 @@ const UserStatements: React.FC<UserStatementsProps> = ({
       <p className="mb-4 text-gray-700">
         {isVoting
           ? hasVotedForThisUser
-            ? "You've made your guess! Waiting for others..."
+            ? "You've made your guess! You can change it by clicking on another statement."
             : "Which one do you think is the lie? Click to vote!"
           : isRevealed
             ? "Results:"
@@ -86,7 +86,8 @@ const UserStatements: React.FC<UserStatementsProps> = ({
             } else if (isVoted) {
               className += "border-indigo-500 bg-indigo-50 border-2";
             } else if (hasVotedForThisUser) {
-              className += "bg-gray-100 cursor-default";
+              // Changed from bg-gray-100 cursor-default to allow hovering on other options
+              className += "hover:bg-gray-50 border-gray-300 cursor-pointer";
             } else {
               className += "hover:bg-gray-50 border-gray-300 cursor-pointer";
             }
@@ -105,8 +106,8 @@ const UserStatements: React.FC<UserStatementsProps> = ({
           return (
             <button
               key={displayIndex}
-              onClick={() => userId !== currentUser.id && isVoting && !hasVotedForThisUser && handleVote(userId, originalIndex)}
-              disabled={userId === currentUser.id || hasVotedForThisUser || !isVoting}
+              onClick={() => userId !== currentUser.id && isVoting && handleVote(userId, originalIndex)}
+              disabled={userId === currentUser.id || !isVoting}
               className={className}
             >
               <div className="flex justify-between items-center">
