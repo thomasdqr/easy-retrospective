@@ -37,4 +37,5 @@ export interface SessionBasicInfo {
 export interface SessionState {
   isRevealed: boolean;
   votingPhase: boolean;
+  voteLimit?: number;
 }

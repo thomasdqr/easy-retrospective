@@ -590,10 +590,17 @@ export const subscribeToIcebreakerState = (sessionId: string, callback: (state: 
  */
 export const toggleVotingPhase = async (
   sessionId: string,
-  votingPhase: boolean
+  votingPhase: boolean,
+  voteLimit?: number
 ): Promise<void> => {
   const votingRef = ref(realtimeDb, `sessions/${sessionId}/votingPhase`);
   await set(votingRef, votingPhase);
+  
+  // If starting voting phase and vote limit is provided, set it
+  if (votingPhase && voteLimit !== undefined) {
+    const voteLimitRef = ref(realtimeDb, `sessions/${sessionId}/voteLimit`);
+    await set(voteLimitRef, voteLimit);
+  }
 };
 
 /**
@@ -622,21 +629,49 @@ export const toggleVoteForStickyNote = async (
   sessionId: string,
   noteId: string,
   userId: string
-): Promise<void> => {
+): Promise<boolean> => {
   // Get current votes first
   const votesRef = ref(realtimeDb, `stickyNotes/${sessionId}/${noteId}/votes`);
   const votesSnapshot = await get(votesRef);
   const votes = votesSnapshot.val() || {};
   
-  // Toggle the vote (add or remove)
+  // Check if user is removing a vote
   if (votes[userId]) {
     votes[userId] = null;
-  } else {
-    votes[userId] = true;
+    await set(votesRef, votes);
+    return true;
   }
   
-  // Update the votes
+  // Check vote limit if the user is adding a vote
+  const voteLimitRef = ref(realtimeDb, `sessions/${sessionId}/voteLimit`);
+  const voteLimitSnapshot = await get(voteLimitRef);
+  const voteLimit = voteLimitSnapshot.val();
+  
+  // If there's a vote limit, check if the user has reached it
+  if (voteLimit !== null && voteLimit !== undefined) {
+    // Count how many votes the user has already used
+    const allStickyNotesRef = ref(realtimeDb, `stickyNotes/${sessionId}`);
+    const allStickyNotesSnapshot = await get(allStickyNotesRef);
+    const allStickyNotes = allStickyNotesSnapshot.val() || {};
+    
+    // Count total votes by this user
+    let userVoteCount = 0;
+    Object.values(allStickyNotes).forEach((note: StickyNote) => {
+      if (note.votes && note.votes[userId]) {
+        userVoteCount++;
+      }
+    });
+    
+    // If user has reached the limit, don't allow more votes
+    if (userVoteCount >= voteLimit) {
+      return false;
+    }
+  }
+  
+  // Add the vote
+  votes[userId] = true;
   await set(votesRef, votes);
+  return true;
 };
 
 /**
@@ -721,4 +756,23 @@ export const deleteDrawingPath = async (
 ): Promise<void> => {
   const drawingRef = ref(realtimeDb, `drawings/${sessionId}/${pathId}`);
   await set(drawingRef, null);
+};
+
+/**
+ * Subscribe to vote limit
+ */
+export const subscribeToVoteLimit = (
+  sessionId: string,
+  callback: (voteLimit: number | null) => void
+): (() => void) => {
+  const voteLimitRef = ref(realtimeDb, `sessions/${sessionId}/voteLimit`);
+  
+  const handleValueChange = (snapshot: DataSnapshot) => {
+    const voteLimit = snapshot.val();
+    callback(voteLimit);
+  };
+  
+  onValue(voteLimitRef, handleValueChange);
+  
+  return () => off(voteLimitRef, 'value', handleValueChange);
 }; 

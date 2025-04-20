@@ -24,7 +24,8 @@ import {
   clearAllDrawings,
   deleteDrawingPath,
   subscribeToIcebreakerState,
-  deleteStickyNote
+  deleteStickyNote,
+  subscribeToVoteLimit
 } from '../services/realtimeDbService';
 import { IcebreakerGameState } from './icebreaker/types';
 
@@ -107,7 +108,9 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const lastPanPosition = useRef({ x: 0, y: 0 });
   const [boardDimensions, setBoardDimensions] = useState({ width: 0, height: 0 });
   const hasPannedRef = useRef<boolean>(false);
-  const [isVotingPhase, setIsVotingPhase] = useState(externalVotingPhase || false);
+  const [isVotingPhase, setIsVotingPhase] = useState(false);
+  const [voteLimit, setVoteLimit] = useState<number | null>(null);
+  const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
   
   // Drawing states
   const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -690,16 +693,27 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
 
   const handleToggleVotingPhase = async () => {
     if (currentUser.isCreator) {
-      const newVotingPhase = !isVotingPhase;
-      setIsVotingPhase(newVotingPhase);
-      
-      // If turning off voting phase and we have voted stickies, notify the parent
-      if (!newVotingPhase && hasVotedStickies()) {
-        onVotingEnd?.(true);
+      // If already in voting phase, just end it
+      if (isVotingPhase) {
+        setIsVotingPhase(false);
+        
+        // Always notify parent when ending voting phase
+        // This ensures the VoteSummary will be shown
+        onVotingEnd?.(hasVotedStickies());
+        
+        await toggleVotingPhase(sessionId, false);
+      } else {
+        // If starting voting phase, show modal to set vote limit
+        setShowVoteLimitModal(true);
       }
-      
-      await toggleVotingPhase(sessionId, newVotingPhase);
     }
+  };
+
+  const startVotingWithLimit = async (limit: number | null) => {
+    setVoteLimit(limit);
+    setIsVotingPhase(true);
+    setShowVoteLimitModal(false);
+    await toggleVotingPhase(sessionId, true, limit === null ? undefined : limit);
   };
 
   const handleShowSummary = () => {
@@ -875,11 +889,29 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
 
   // When voting phase changes from true to false, notify parent if we have voted stickies
   useEffect(() => {
-    if (prevVotingPhaseRef.current && !isVotingPhase && hasVotedStickies()) {
-      onVotingEnd?.(true);
+    // Tracking voting phase changes
+    if (prevVotingPhaseRef.current && !isVotingPhase) {
+      // When voting ends, always notify parent with the vote status
+      onVotingEnd?.(hasVotedStickies());
     }
     prevVotingPhaseRef.current = isVotingPhase;
   }, [isVotingPhase, onVotingEnd]);
+
+  // Subscribe to vote limit
+  useEffect(() => {
+    const unsubscribe = subscribeToVoteLimit(sessionId, (limit) => {
+      setVoteLimit(limit);
+    });
+    
+    return () => unsubscribe();
+  }, [sessionId]);
+
+  // Calculate user vote count
+  const getUserVoteCount = () => {
+    return Object.values(stickyNotes).reduce((count, note) => {
+      return count + (note.votes && note.votes[currentUser.id] ? 1 : 0);
+    }, 0);
+  };
 
   return (
     <div 
@@ -914,6 +946,45 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           }
         `}
       </style>
+      
+      {/* Vote Limit Modal */}
+      {showVoteLimitModal && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-80 max-w-full">
+            <h3 className="text-xl font-semibold mb-4">Set Vote Limit</h3>
+            <p className="text-gray-600 mb-4">
+              How many votes should each participant have? (Leave empty for unlimited votes)
+            </p>
+            <div className="mb-4">
+              <input
+                type="number"
+                min="1"
+                placeholder="e.g., 3"
+                className="w-full p-2 border border-gray-300 rounded"
+                onChange={(e) => {
+                  const value = e.target.value ? parseInt(e.target.value, 10) : null;
+                  setVoteLimit(value);
+                }}
+                value={voteLimit === null ? '' : voteLimit}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setShowVoteLimitModal(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => startVotingWithLimit(voteLimit)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+              >
+                Start Voting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Whiteboard */}
       <div
@@ -1193,8 +1264,32 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
             <div className="flex items-center bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap relative group">
               <ThumbsUp className="w-4 h-4 mr-1" />
               <span>Voting active</span>
+              {voteLimit !== null && (
+                <span className="ml-2 bg-white px-2 py-0.5 rounded-full text-xs">
+                  {getUserVoteCount()}/{voteLimit} votes
+                </span>
+              )}
               <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
                 Voting is currently in progress
+                {voteLimit !== null && ` - You can use up to ${voteLimit} votes`}
+              </div>
+            </div>
+          )}
+          
+          {/* Creator voting indicator with vote limit */}
+          {currentUser.isCreator && isVotingPhase && (
+            <div className="ml-4 flex items-center bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap relative group">
+              <ThumbsUp className="w-4 h-4 mr-1" />
+              <span>Voting active</span>
+              {voteLimit !== null && (
+                <span className="ml-2 bg-white px-2 py-0.5 rounded-full text-xs">
+                  {getUserVoteCount()}/{voteLimit} votes
+                </span>
+              )}
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                {voteLimit !== null 
+                  ? `Each user has ${voteLimit} votes to distribute` 
+                  : "Users have unlimited votes"}
               </div>
             </div>
           )}

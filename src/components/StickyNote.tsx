@@ -246,7 +246,11 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author,
   const handleVoteToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isVotingPhase) {
-      await toggleVoteForStickyNote(sessionId, note.id, currentUser.id);
+      const success = await toggleVoteForStickyNote(sessionId, note.id, currentUser.id);
+      if (!success) {
+        // Show toast or alert about vote limit
+        alert("You've reached your vote limit for this session!");
+      }
     }
   };
 
