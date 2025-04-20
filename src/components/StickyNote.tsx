@@ -31,9 +31,10 @@ interface StickyNoteProps {
   isRevealed: boolean;
   author: User;
   isVotingPhase: boolean;
+  zoomLevel?: number;
 }
 
-function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author, isVotingPhase }: StickyNoteProps) {
+function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author, isVotingPhase, zoomLevel = 1 }: StickyNoteProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState(note.position);
   const [isEditing, setIsEditing] = useState(false);
@@ -163,8 +164,8 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author,
 
     const handleMouseMove = (e: MouseEvent) => {
       // Calculate the delta from the starting position
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
+      const deltaX = (e.clientX - startX) / zoomLevel;  // Adjust delta for zoom level
+      const deltaY = (e.clientY - startY) / zoomLevel;  // Adjust delta for zoom level
       
       // Apply the delta to the original position to get absolute coordinates
       const newPosition = {

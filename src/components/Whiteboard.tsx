@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain } from 'lucide-react';
+import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain, ZoomIn, ZoomOut } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import RetroSummary from './RetroSummary';
 import { nanoid } from 'nanoid';
@@ -101,11 +101,12 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const lastPanPosition = useRef({ x: 0, y: 0 });
   const [boardDimensions, setBoardDimensions] = useState({ width: 0, height: 0 });
   const hasPannedRef = useRef<boolean>(false);
   const [isVotingPhase, setIsVotingPhase] = useState(externalVotingPhase || false);
-
+  
   // Drawing states
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
@@ -168,7 +169,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     ) || null;
   };
   
-  // Update board dimensions when the board is resized
+  // Update board dimensions and add wheel event listener
   useEffect(() => {
     if (!boardRef.current) return;
     
@@ -185,10 +186,28 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     // Add resize listener
     window.addEventListener('resize', updateDimensions);
     
+    // Add wheel event listener with { passive: false } to ensure preventDefault works
+    // but only to prevent default browser behavior, not to prevent our own handlers
+    const boardElement = boardRef.current.parentElement;
+    if (boardElement) {
+      const wheelHandler = (e: WheelEvent) => {
+        // Only prevent default browser behavior (back/forward navigation, page scrolling)
+        // but don't stop propagation - we need the event to reach our handleWheel
+        if (!isDrawingMode) {
+          e.preventDefault();
+        }
+      };
+      boardElement.addEventListener('wheel', wheelHandler, { passive: false });
+      return () => {
+        window.removeEventListener('resize', updateDimensions);
+        boardElement.removeEventListener('wheel', wheelHandler);
+      };
+    }
+    
     return () => {
       window.removeEventListener('resize', updateDimensions);
     };
-  }, []);
+  }, [isDrawingMode]);
 
   // Separate effect to handle initial centering after everything is loaded
   useEffect(() => {
@@ -196,7 +215,9 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     if (Object.keys(columns).length > 0 && boardDimensions.width > 0) {
       // Small delay to ensure DOM is fully rendered
       const timer = setTimeout(() => {
-        setPan(calculateCenterPosition());
+        const centerPosition = calculateCenterPosition();
+        setPan({ x: centerPosition.x, y: centerPosition.y });
+        setZoomLevel(centerPosition.zoom);
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -204,25 +225,22 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
 
   // Transform cursor positions between viewports
   const transformCursorPosition = (
-    cursor: CursorData,
-    localPan: { x: number; y: number }
+    cursor: CursorData
   ) => {
-    // Handle cases where cursor might not have pan data yet
-    const cursorPan = cursor.pan ?? { x: 0, y: 0 };
-
-    // Convert from other user's viewport to our viewport
+    // Since cursors are inside the transformed container, we just return the coordinates
+    // Using the same coordinate system as sticky notes
     return {
-      x: cursor.x + cursorPan.x + localPan.x,
-      y: cursor.y + cursorPan.y + localPan.y
+      x: cursor.x,
+      y: cursor.y
     };
   };
 
   // Calculate the center position for resetting view
   const calculateCenterPosition = () => {
-    if (!boardRef.current) return { x: 0, y: 0 };
+    if (!boardRef.current) return { x: 0, y: 0, zoom: 1 };
     
     const containerRect = boardRef.current.parentElement?.getBoundingClientRect();
-    if (!containerRect) return { x: 0, y: 0 };
+    if (!containerRect) return { x: 0, y: 0, zoom: 1 };
     
     // Total width of all columns
     const totalBoardWidth = columnsArray.reduce(
@@ -230,11 +248,21 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       0
     );
     
-    // Center horizontally by calculating the offset needed
-    const centerX = (containerRect.width - totalBoardWidth) / 2;
+    // Calculate the zoom level needed to fit all columns in the viewport width
+    // Add a small padding (0.95) to leave some space on the sides
+    const optimalZoom = Math.min(
+      (containerRect.width * 0.95) / totalBoardWidth,
+      3 // Maximum zoom level
+    );
+    
+    // Don't go below minimum zoom
+    const finalZoom = Math.max(0.5, optimalZoom);
+    
+    // Calculate horizontal centering position based on the zoom
+    const centerX = (containerRect.width - (totalBoardWidth * finalZoom)) / 2;
     
     // For vertical centering, just return to top since columns extend to full height
-    return { x: centerX, y: 60 };
+    return { x: centerX, y: 60, zoom: finalZoom };
   };
 
   // Memoize sticky notes array to prevent unnecessary re-renders
@@ -249,14 +277,14 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       .filter(([userId]) => userId !== currentUser.id && users[userId])
       .map(([userId, cursor]) => {
         // Transform the cursor position from the other user's viewport to our viewport
-        const transformedPosition = transformCursorPosition(cursor, pan);
+        const transformedPosition = transformCursorPosition(cursor);
         return {
           userId,
           user: users[userId],
           position: transformedPosition
         };
       });
-  }, [realtimeCursors, users, currentUser.id, pan]);
+  }, [realtimeCursors, users, currentUser.id]);
 
   // Subscribe to realtime cursor updates
   useEffect(() => {
@@ -309,13 +337,16 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       if (!boardRef.current || !cursorUpdateRef.current) return;
       
       const rect = boardRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-      // Send cursor position along with current pan state
+      // Adjust coordinates for zoom level
+      const adjustedX = mouseX / zoomLevel;
+      const adjustedY = mouseY / zoomLevel;
+      
       cursorUpdateRef.current({
-        x: x - pan.x,
-        y: y - pan.y,
+        x: adjustedX,
+        y: adjustedY,
         pan,
         lastUpdate: Date.now()
       });
@@ -331,7 +362,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         board.removeEventListener('mousemove', throttledCursorUpdate);
       }
     };
-  }, [sessionId, currentUser.id, pan]);
+  }, [sessionId, currentUser.id, pan, zoomLevel]);
 
   // Subscribe to drawings
   useEffect(() => {
@@ -355,10 +386,9 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     const boardRect = boardRef.current?.getBoundingClientRect();
     if (!boardRect) return;
     
-    // Simple offset from the viewport, no need to adjust for pan here
-    // since the points will be drawn relative to the panned board position
-    const adjustedX = mouseX - boardRect.left;
-    const adjustedY = mouseY - boardRect.top;
+    // Adjust for the board's position and zoom
+    const adjustedX = (mouseX - boardRect.left) / zoomLevel;
+    const adjustedY = (mouseY - boardRect.top) / zoomLevel;
 
     if (isEraser) {
       // Set erasing state to true when mouse is pressed
@@ -398,9 +428,9 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     const boardRect = boardRef.current?.getBoundingClientRect();
     if (!boardRect) return;
     
-    // Simple offset from the viewport, no need to adjust for pan here
-    const adjustedX = mouseX - boardRect.left;
-    const adjustedY = mouseY - boardRect.top;
+    // Adjust for the board's position and zoom
+    const adjustedX = (mouseX - boardRect.left) / zoomLevel;
+    const adjustedY = (mouseY - boardRect.top) / zoomLevel;
     
     if (isEraser && isErasing) {
       // Only erase if the mouse button is pressed (isErasing is true)
@@ -613,18 +643,50 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     }
   };
 
-  // Handle scroll wheel events for panning
+  // Handle wheel scroll events
   const handleWheel = (e: React.WheelEvent) => {
     // Skip if we're in drawing mode
     if (isDrawingMode) return;
 
+    // Prevent default browser behaviors
     e.preventDefault();
     
-    // Update pan based on scroll deltas
-    setPan(prev => ({
-      x: prev.x - e.deltaX,
-      y: prev.y - e.deltaY
-    }));
+    // Only zoom when using Ctrl key (pinch on trackpad or Ctrl+mousewheel)
+    const isPinchZoom = e.ctrlKey;
+    
+    // Handle zooming (only with Ctrl key / pinch)
+    if (isPinchZoom) {
+      // Get mouse position relative to board
+      const rect = boardRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Calculate zoom factor (smaller steps for smoother zoom)
+      const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
+      const newZoom = Math.max(0.5, Math.min(3, zoomLevel * zoomFactor));
+      
+      // If we hit zoom limits, don't do anything (prevent panning)
+      if ((zoomLevel === 0.5 && e.deltaY > 0) || (zoomLevel === 3 && e.deltaY < 0)) {
+        return;
+      }
+      
+      // Calculate new pan position to zoom toward/away from mouse pointer
+      const newPan = {
+        x: pan.x - ((mouseX) * (zoomFactor - 1)),
+        y: pan.y - ((mouseY) * (zoomFactor - 1))
+      };
+      
+      setZoomLevel(newZoom);
+      setPan(newPan);
+    } else {
+      // Regular panning behavior for all other wheel events
+      setPan(prev => ({
+        x: prev.x - e.deltaX,
+        y: prev.y - e.deltaY
+      }));
+    }
   };
 
   const handleToggleVotingPhase = async () => {
@@ -643,13 +705,17 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     // Prevent adding notes during voting phase
     if (isVotingPhase) return;
     
-    // Get mouse position relative to the viewport
-    const mouseX = e.clientX;
-    const mouseY = e.clientY;
+    // Get board element position
+    const boardRect = boardRef.current?.getBoundingClientRect();
+    if (!boardRect) return;
+
+    // Calculate position
+    const mouseX = e.clientX - boardRect.left;
+    const mouseY = e.clientY - boardRect.top;
     
-    // Adjust for current pan position
-    const adjustedX = mouseX - pan.x;
-    const adjustedY = mouseY - pan.y;
+    // Adjust coordinates for zoom level
+    const adjustedX = mouseX / zoomLevel;
+    const adjustedY = mouseY / zoomLevel;
     
     // Sticky note width (should match the value in getNoteColumn)
     const stickyNoteWidth = 256; // 16rem or 256px (w-64 in Tailwind)
@@ -774,7 +840,19 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   }, [sessionId]);
 
   return (
-    <div className="relative w-full h-full flex flex-col">
+    <div 
+      className="relative w-full h-full flex flex-col" 
+      onWheel={(e) => {
+        // Only prevent browser scrolling/navigation, don't stop propagation
+        // so our own wheel handlers can still process the event
+        e.preventDefault();
+      }}
+      style={{
+        // Ensure the whiteboard captures all gestures
+        overscrollBehavior: 'none',
+        touchAction: 'none'
+      }}
+    >
       {/* Whiteboard */}
       <div
         onMouseDown={handleMouseDown}
@@ -784,19 +862,90 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         onWheel={handleWheel}
         className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative flex-grow"
         style={{
-          cursor: isDrawingMode ? 'crosshair' : isPanning ? 'grabbing' : 'default'
+          cursor: isDrawingMode ? 'crosshair' : isPanning ? 'grabbing' : 'default',
+          overscrollBehavior: 'none',
+          touchAction: 'none'
         }}
       >
         {/* Floating Toolbar */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-3 transition-all duration-300 hover:shadow-xl">
           <button
-            onClick={() => setPan(calculateCenterPosition())}
+            onClick={() => {
+              const centerPosition = calculateCenterPosition();
+              setPan({ x: centerPosition.x, y: centerPosition.y });
+              setZoomLevel(centerPosition.zoom);
+            }}
             className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
-            title="Center View"
+            title="Fit All Columns"
           >
             <Focus className="w-4 h-4" />
             <span className="text-sm font-medium whitespace-nowrap">Center</span>
           </button>
+          
+          {/* Zoom indicator and controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // Get the center point of the viewport
+                const container = boardRef.current?.parentElement;
+                if (!container) return;
+                
+                const rect = container.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                // Calculate zoom factor and new zoom level
+                const zoomFactor = 0.9; // 10% reduction
+                const newZoom = Math.max(0.5, zoomLevel * zoomFactor);
+                
+                // Calculate new pan position to zoom out from center
+                const newPan = {
+                  x: pan.x + (centerX) * (1 - zoomFactor) / zoomLevel,
+                  y: pan.y + (centerY) * (1 - zoomFactor) / zoomLevel
+                };
+                
+                setZoomLevel(newZoom);
+                setPan(newPan);
+              }}
+              className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            
+            <div className="text-xs font-medium text-gray-500 whitespace-nowrap">
+              {Math.round(zoomLevel * 100)}%
+            </div>
+            
+            <button
+              onClick={() => {
+                // Get the center point of the viewport
+                const container = boardRef.current?.parentElement;
+                if (!container) return;
+                
+                const rect = container.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                // Calculate zoom factor and new zoom level
+                const zoomFactor = 1.1; // 10% increase
+                const newZoom = Math.min(3, zoomLevel * zoomFactor);
+                
+                // Calculate new pan position to zoom in toward center
+                const newPan = {
+                  x: pan.x - (centerX) * (zoomFactor - 1) / zoomLevel,
+                  y: pan.y - (centerY) * (zoomFactor - 1) / zoomLevel
+                };
+                
+                setZoomLevel(newZoom);
+                setPan(newPan);
+              }}
+              className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
           
           {/* Drawing mode toggle button - always visible regardless of voting phase */}
           <button
@@ -924,7 +1073,8 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           ref={boardRef}
           className="absolute inset-0"
           style={{
-            transform: `translate(${pan.x}px, ${pan.y}px)`,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
+            transformOrigin: '0 0',
             transition: isPanning ? 'none' : 'transform 0.1s ease-out',
             height: 'auto',
             minHeight: '3000px'
@@ -1111,6 +1261,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                 isRevealed={isRevealed}
                 author={users[note.authorId]}
                 isVotingPhase={isVotingPhase}
+                zoomLevel={zoomLevel}
               />
             ))}
           </div>
@@ -1130,32 +1281,38 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
               onMouseLeave={handleEndDrawing}
             />
           )}
-        </div>
-        
-        {/* User cursors (always on top) */}
-        <div className="absolute inset-0 pointer-events-none z-50">
-          {cursors.map(({ userId, user, position }) => (
-            <div
-              key={userId}
-              className="absolute pointer-events-none"
-              style={{
-                transform: `translate(${position.x}px, ${position.y}px)`,
-                transition: 'transform 0.2s ease-out',
-                zIndex: 1000
-              }}
-            >
-              <img
-                src={user.avatar}
-                alt={user.name}
-                className="w-8 h-8 rounded-full border-2 border-white shadow-md bg-gray-100"
-              />
-              <span
-                className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap"
+          
+          {/* User cursors - moved inside the transformed container */}
+          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 45 }}>
+            {cursors.map(({ userId, user, position }) => (
+              <div
+                key={userId}
+                className="absolute pointer-events-none"
+                style={{
+                  left: position.x,
+                  top: position.y,
+                  transform: 'translate(-50%, -50%)',
+                  transition: 'left 0.2s ease-out, top 0.2s ease-out',
+                  width: '32px',
+                  height: '32px',
+                  transformOrigin: 'center',
+                  transformStyle: 'preserve-3d'
+                }}
               >
-                {user.name}
-              </span>
-            </div>
-          ))}
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="w-8 h-8 rounded-full border-2 border-white shadow-md bg-gray-100"
+                  style={{ width: '32px', height: '32px', objectFit: 'cover' }}
+                />
+                <span
+                  className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap"
+                >
+                  {user.name}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       
