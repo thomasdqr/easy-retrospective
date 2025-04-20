@@ -6,11 +6,13 @@ import UserList from '../components/UserList';
 import Whiteboard from '../components/Whiteboard';
 import Icebreaker from '../components/Icebreaker';
 import Timer from '../components/Timer';
+import VoteSummary from '../components/VoteSummary';
 import { Copy, EyeOff, ThumbsUp } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
-import { subscribeToSessionRevealed, toggleSessionReveal, subscribeToIcebreakerState, subscribeToVotingPhase } from '../services/realtimeDbService';
+import { subscribeToSessionRevealed, toggleSessionReveal, subscribeToIcebreakerState, subscribeToVotingPhase, subscribeToStickyNotes } from '../services/realtimeDbService';
 import { USER_SESSION_KEY } from '../constants';
+import { StickyNote } from '../types';
 
 // Key for storing retrospective started status in localStorage
 const RETROSPECTIVE_STARTED_KEY = 'retrospective_started_';
@@ -26,6 +28,8 @@ function Session() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [icebreakerCompleted, setIcebreakerCompleted] = useState(false);
   const [retrospectiveStarted, setRetrospectiveStarted] = useState(false);
+  const [showVoteSummary, setShowVoteSummary] = useState(false);
+  const [stickyNotes, setStickyNotes] = useState<Record<string, StickyNote>>({});
 
   useEffect(() => {
     if (!sessionId) {
@@ -89,6 +93,18 @@ function Session() {
       (votingPhaseStatus) => {
         console.log('Received voting phase update:', votingPhaseStatus);
         setIsVotingPhase(votingPhaseStatus);
+        // Hide vote summary when voting starts
+        if (votingPhaseStatus) {
+          setShowVoteSummary(false);
+        }
+      }
+    );
+
+    // Subscribe to sticky notes
+    const unsubscribeStickyNotes = subscribeToStickyNotes(
+      sessionId,
+      (stickyNotesData) => {
+        setStickyNotes(stickyNotesData);
       }
     );
 
@@ -110,6 +126,7 @@ function Session() {
       unsubscribeRevealed();
       unsubscribeIcebreaker();
       unsubscribeVoting();
+      unsubscribeStickyNotes();
     };
   }, [sessionId, navigate]);
 
@@ -177,6 +194,13 @@ function Session() {
     }
   };
 
+  // Handle voting end notification from Whiteboard
+  const handleVotingEnd = (hasVotes: boolean) => {
+    if (hasVotes) {
+      setShowVoteSummary(true);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -241,7 +265,7 @@ function Session() {
                 <p className="text-gray-500">The icebreaker will start when others join</p>
               </div>
             </div>
-            <div className="fixed bottom-4 right-4 z-50">
+            <div className="fixed bottom-4 right-4 z-50 w-80">
               <UserList 
                 users={sessionBasicInfo.users || {}} 
                 sessionId={sessionId}
@@ -258,7 +282,7 @@ function Session() {
               onComplete={handleIcebreakerComplete}
             />
 
-            <div className="fixed bottom-4 right-4 z-50">
+            <div className="fixed bottom-4 right-4 z-50 w-80">
               <UserList 
                 users={sessionBasicInfo.users || {}} 
                 sessionId={sessionId}
@@ -329,19 +353,41 @@ function Session() {
             isRevealed={isRevealed}
             onToggleReveal={currentUser.isCreator ? handleToggleReveal : undefined}
             isVotingPhase={isVotingPhase}
+            onVotingEnd={handleVotingEnd}
           />
         )}
       </div>
       
-      {/* Bottom bar with Timer and User list */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-4">
-        {currentUser && <Timer currentUser={currentUser} sessionId={sessionId || ''} />}
-        <UserList 
-          users={sessionBasicInfo?.users || {}} 
-          sessionId={sessionId || ''}
-          currentUser={currentUser}
-        />
+      {/* Unified bottom bar with Timer, Vote Summary and User list */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-4 w-80">
+        {showVoteSummary && !isVotingPhase && sessionId && (
+          <VoteSummary stickyNotes={stickyNotes} users={sessionBasicInfo?.users || {}} />
+        )}
+        {currentUser && sessionId && (
+          <Timer currentUser={currentUser} sessionId={sessionId} />
+        )}
+        {sessionBasicInfo && sessionId && (
+          <UserList 
+            users={sessionBasicInfo.users || {}} 
+            sessionId={sessionId}
+            currentUser={currentUser}
+          />
+        )}
       </div>
+
+      {/* Add keyframe animations for the gradient effects */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes glowPulse {
+          0% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
+          50% { box-shadow: 0 0 20px rgba(167, 139, 250, 0.6); }
+          100% { box-shadow: 0 0 10px rgba(236, 72, 153, 0.4); }
+        }
+      `}} />
     </div>
   );
 }

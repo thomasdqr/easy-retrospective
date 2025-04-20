@@ -90,7 +90,7 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-lg p-4 w-64 border border-gray-100">
+    <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-lg p-4 w-full border border-gray-100">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Participants</h3>
       <div className="space-y-3 max-h-[50vh] overflow-y-auto">
         {sortedUsers.map((user) => {

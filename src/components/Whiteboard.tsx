@@ -35,6 +35,7 @@ interface WhiteboardProps {
   isRevealed?: boolean;
   onToggleReveal?: () => void;
   isVotingPhase?: boolean;
+  onVotingEnd?: (hasVotes: boolean) => void;
 }
 
 // Add interface for cursor data
@@ -89,7 +90,7 @@ const DRAWING_COLORS = [
   '#000000'  // Black
 ];
 
-function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggleReveal, isVotingPhase: externalVotingPhase }: WhiteboardProps) {
+function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggleReveal, isVotingPhase: externalVotingPhase, onVotingEnd }: WhiteboardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater>>();
   const [realtimeCursors, setRealtimeCursors] = useState<Record<string, CursorData>>({});
@@ -123,6 +124,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     activeUser: null,
     revealed: false
   });
+  const prevVotingPhaseRef = useRef(false);
 
   // Memoized array of columns sorted by x position
   const columnsArray = useMemo(() => {
@@ -694,6 +696,12 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     if (currentUser.isCreator) {
       const newVotingPhase = !isVotingPhase;
       setIsVotingPhase(newVotingPhase);
+      
+      // If turning off voting phase and we have voted stickies, notify the parent
+      if (!newVotingPhase && hasVotedStickies()) {
+        onVotingEnd?.(true);
+      }
+      
       await toggleVotingPhase(sessionId, newVotingPhase);
     }
   };
@@ -852,6 +860,21 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     return () => unsubscribe();
   }, [sessionId]);
 
+  // Check if there are any stickies with votes
+  const hasVotedStickies = () => {
+    return Object.values(stickyNotes).some(note => 
+      note.votes && Object.values(note.votes).filter(Boolean).length > 0
+    );
+  };
+
+  // When voting phase changes from true to false, notify parent if we have voted stickies
+  useEffect(() => {
+    if (prevVotingPhaseRef.current && !isVotingPhase && hasVotedStickies()) {
+      onVotingEnd?.(true);
+    }
+    prevVotingPhaseRef.current = isVotingPhase;
+  }, [isVotingPhase, onVotingEnd]);
+
   return (
     <div 
       className="relative w-full h-full flex flex-col" 
@@ -881,7 +904,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         }}
       >
         {/* Floating Toolbar */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-3 transition-all duration-300 hover:shadow-xl">
+        <div className="absolute bottom-4 left-[calc(50%-10.5rem)] transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-3 transition-all duration-300 hover:shadow-xl">
           <button
             onClick={() => {
               const centerPosition = calculateCenterPosition();
@@ -1041,7 +1064,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                     title={isRevealed ? "Hide Notes" : "Show Notes"}
                   >
                     {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    <span className="text-sm font-medium whitespace-nowrap">{isRevealed ? "Hide" : "Show"}</span>
+                    <span className="text-sm font-medium whitespace-nowrap">{isRevealed ? "Hide Notes" : "Show Notes"}</span>
                   </button>
                   
                   <div className="h-8 w-px bg-gray-200 mx-1"></div>
@@ -1340,20 +1363,6 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           onClose={() => setShowSummary(false)}
         />
       )}
-
-      {/* Add keyframe animations to the bottom of the component right before the final return statement */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes gradientShift {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes glowPulse {
-          0% { box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
-          50% { box-shadow: 0 0 20px rgba(167, 139, 250, 0.6); }
-          100% { box-shadow: 0 0 10px rgba(236, 72, 153, 0.4); }
-        }
-      `}} />
     </div>
   );
 }

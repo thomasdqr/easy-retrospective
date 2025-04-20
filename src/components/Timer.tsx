@@ -110,7 +110,7 @@ const Timer: React.FC<TimerProps> = ({ currentUser, sessionId }) => {
   }
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-lg p-4 border border-gray-100">
+    <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-lg p-4 border border-gray-100 w-full">
       <div className="flex items-center gap-4">
         {showInput && currentUser.isCreator ? (
           <div className="flex items-center gap-2">
