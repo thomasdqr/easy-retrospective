@@ -535,19 +535,21 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       return;
     }
     
-    // Original panning logic
-    // Only enable panning when clicking directly on the sticky notes container
-    // and not on any sticky notes themselves
-    if (e.button === 0 && (e.target === boardRef.current || e.currentTarget.contains(e.target as Node))) {
-      // Skip panning if we clicked on a sticky note, input, button, or select
-      if ((e.target as HTMLElement).closest('.sticky-note, input, button, select, textarea')) return;
+    // Check if we're using middle mouse button
+    const isMiddleMouseButton = e.button === 1;
+    
+    // Panning with middle mouse button or left button
+    if ((isMiddleMouseButton || e.button === 0) && (e.target === boardRef.current || e.currentTarget.contains(e.target as Node))) {
+      // For middle mouse button, always allow panning regardless of what's under it
+      // For left click, skip panning if we clicked on a sticky note, input, button, or select
+      if (!isMiddleMouseButton && (e.target as HTMLElement).closest('.sticky-note, input, button, select, textarea')) return;
       
       // Check if we're editing a sticky note or a column
       const isEditingStickyNote = document.querySelector('.sticky-note textarea') !== null;
       const isEditingColumn = editingColumn !== null;
       
-      // Skip panning if we're editing
-      if (isEditingStickyNote || isEditingColumn) return;
+      // Skip panning if we're editing, but only for left click
+      if (!isMiddleMouseButton && (isEditingStickyNote || isEditingColumn)) return;
       
       e.preventDefault();
       setIsPanning(true);
@@ -591,7 +593,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     // Original panning/click logic
     if (isPanning) {
       // If the mouse is released and there was no significant panning, consider it a click
-      if (!hasPannedRef.current) {
+      if (!hasPannedRef.current && e.button === 0) {
         // Check if we're editing a sticky note or a column
         const isEditingStickyNote = document.querySelector('.sticky-note textarea') !== null;
         const isEditingColumn = editingColumn !== null;
@@ -609,6 +611,20 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       // Reset the panning state
       setIsPanning(false);
     }
+  };
+
+  // Handle scroll wheel events for panning
+  const handleWheel = (e: React.WheelEvent) => {
+    // Skip if we're in drawing mode
+    if (isDrawingMode) return;
+
+    e.preventDefault();
+    
+    // Update pan based on scroll deltas
+    setPan(prev => ({
+      x: prev.x - e.deltaX,
+      y: prev.y - e.deltaY
+    }));
   };
 
   const handleToggleVotingPhase = async () => {
@@ -765,6 +781,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
         className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative flex-grow"
         style={{
           cursor: isDrawingMode ? 'crosshair' : isPanning ? 'grabbing' : 'default'
@@ -1155,7 +1172,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       )}
 
       {/* Add keyframe animations to the bottom of the component right before the final return statement */}
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{__html: `
         @keyframes gradientShift {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
@@ -1166,7 +1183,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
           50% { box-shadow: 0 0 20px rgba(167, 139, 250, 0.6); }
           100% { box-shadow: 0 0 10px rgba(236, 72, 153, 0.4); }
         }
-      `}</style>
+      `}} />
     </div>
   );
 }
