@@ -44,7 +44,7 @@ interface CursorData {
   lastUpdate: number;
 }
 
-const COLUMN_WIDTH = 350;
+const COLUMN_WIDTH = 800;
 
 // Define default retrospective columns
 const DEFAULT_RETROSPECTIVE_COLUMNS: Column[] = [
