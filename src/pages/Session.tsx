@@ -313,7 +313,7 @@ function Session() {
             {!isRevealed && (
               <div className="flex items-center gap-2 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
                 <EyeOff className="w-4 h-4" />
-                <span>Notes are hidden</span>
+                <span>Stickies are hidden</span>
               </div>
             )}
             {isVotingPhase && (

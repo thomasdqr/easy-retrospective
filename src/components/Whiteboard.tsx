@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain, ZoomIn, ZoomOut } from 'lucide-react';
+import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain, ZoomIn, ZoomOut, Move, StickyNoteIcon, VoteIcon, ThumbsUpIcon } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import RetroSummary from './RetroSummary';
 import { nanoid } from 'nanoid';
@@ -125,6 +125,11 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     revealed: false
   });
   const prevVotingPhaseRef = useRef(false);
+  
+  // Set initial activeToolbarGroup state based on user role
+  const [activeToolbarGroup, setActiveToolbarGroup] = useState<string | null>(
+    currentUser.isCreator ? 'stickies' : 'navigation'
+  );
 
   // Memoized array of columns sorted by x position
   const columnsArray = useMemo(() => {
@@ -540,15 +545,6 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     setCurrentPath(null);
   };
 
-  // Toggle drawing mode
-  const toggleDrawingMode = () => {
-    setIsDrawingMode(!isDrawingMode);
-    // Reset eraser when toggling drawing mode
-    if (!isDrawingMode) {
-      setIsEraser(false);
-    }
-  };
-
   // Toggle eraser mode
   const toggleEraser = () => {
     setIsEraser(!isEraser);
@@ -833,6 +829,16 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     }
   };
 
+  // When one toolbar group is selected, close others
+  useEffect(() => {
+    if (activeToolbarGroup === 'drawing' && !isDrawingMode) {
+      setIsDrawingMode(true);
+    } else if (activeToolbarGroup !== 'drawing' && isDrawingMode) {
+      // If drawing mode is active but we're selecting another group, exit drawing mode
+      setIsDrawingMode(false);
+    }
+  }, [activeToolbarGroup, isDrawingMode]);
+
   // Subscribe to voting phase state
   useEffect(() => {
     const unsubscribe = subscribeToVotingPhase(sessionId, (votingPhase) => {
@@ -889,6 +895,26 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         touchAction: 'none'
       }}
     >
+      {/* Add CSS for animations */}
+      <style>
+        {`
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateX(-10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+          
+          .animate-fadeIn {
+            animation: fadeIn 0.2s ease-out forwards;
+          }
+        `}
+      </style>
+      
       {/* Whiteboard */}
       <div
         onMouseDown={handleMouseDown}
@@ -904,203 +930,273 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         }}
       >
         {/* Floating Toolbar */}
-        <div className="absolute bottom-4 left-[calc(50%-10.5rem)] transform -translate-x-1/2 z-50 px-4 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-3 transition-all duration-300 hover:shadow-xl">
-          <button
-            onClick={() => {
-              const centerPosition = calculateCenterPosition();
-              setPan({ x: centerPosition.x, y: centerPosition.y });
-              setZoomLevel(centerPosition.zoom);
-            }}
-            className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
-            title="Fit All Columns"
-          >
-            <Focus className="w-4 h-4" />
-            <span className="text-sm font-medium whitespace-nowrap">Center</span>
-          </button>
-          
-          {/* Zoom indicator and controls */}
-          <div className="flex items-center gap-2">
+        <div className="absolute bottom-4 left-[calc(50%-10.5rem)] transform -translate-x-1/2 z-50 px-3 py-2 bg-white rounded-full shadow-lg border border-gray-200 flex gap-2 transition-all duration-300 hover:shadow-xl">
+          {/* Navigation Group */}
+          <div className="flex items-center">
             <button
-              onClick={() => {
-                // Get the center point of the viewport
-                const container = boardRef.current?.parentElement;
-                if (!container) return;
-                
-                const rect = container.getBoundingClientRect();
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                
-                // Calculate zoom factor and new zoom level
-                const zoomFactor = 0.9; // 10% reduction
-                const newZoom = Math.max(0.5, zoomLevel * zoomFactor);
-                
-                // Calculate new pan position to zoom out from center
-                const newPan = {
-                  x: pan.x + (centerX) * (1 - zoomFactor) / zoomLevel,
-                  y: pan.y + (centerY) * (1 - zoomFactor) / zoomLevel
-                };
-                
-                setZoomLevel(newZoom);
-                setPan(newPan);
-              }}
-              className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors"
-              title="Zoom Out"
+              onClick={() => setActiveToolbarGroup(activeToolbarGroup === 'navigation' ? null : 'navigation')}
+              className={`p-2 rounded-full ${activeToolbarGroup === 'navigation' ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-gray-100 flex items-center transition-colors relative group`}
             >
-              <ZoomOut className="w-4 h-4" />
+              <Move className="w-4 h-4" />
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                Navigation Tools
+              </div>
             </button>
             
-            <div className="text-xs font-medium text-gray-500 whitespace-nowrap">
-              {Math.round(zoomLevel * 100)}%
-            </div>
-            
-            <button
-              onClick={() => {
-                // Get the center point of the viewport
-                const container = boardRef.current?.parentElement;
-                if (!container) return;
-                
-                const rect = container.getBoundingClientRect();
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                
-                // Calculate zoom factor and new zoom level
-                const zoomFactor = 1.1; // 10% increase
-                const newZoom = Math.min(3, zoomLevel * zoomFactor);
-                
-                // Calculate new pan position to zoom in toward center
-                const newPan = {
-                  x: pan.x - (centerX) * (zoomFactor - 1) / zoomLevel,
-                  y: pan.y - (centerY) * (zoomFactor - 1) / zoomLevel
-                };
-                
-                setZoomLevel(newZoom);
-                setPan(newPan);
-              }}
-              className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-          </div>
-          
-          {/* Drawing mode toggle button - always visible regardless of voting phase */}
-          <button
-            onClick={toggleDrawingMode}
-            className={`p-2 rounded-full ${isDrawingMode ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 hover:text-blue-700 flex items-center gap-1.5 transition-colors`}
-            title={isDrawingMode ? "Exit Drawing Mode" : "Draw on Whiteboard"}
-          >
-            <PencilLine className="w-4 h-4" />
-            <span className="text-sm font-medium whitespace-nowrap">{isDrawingMode ? "Exit Drawing" : "Draw"}</span>
-          </button>
-          
-          {/* Drawing options - only show when in drawing mode */}
-          {isDrawingMode && (
-            <div className="h-full flex items-center gap-2">
-              <div className="flex gap-2 items-center">
-                {DRAWING_COLORS.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => {
-                      setDrawingColor(color);
-                      setIsEraser(false);
-                    }}
-                    className={`w-6 h-6 rounded-full cursor-pointer ${isEraser ? '' : drawingColor === color ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
-                    style={{ backgroundColor: color }}
-                    title={`Use ${color === '#FF0000' ? 'Red' : color === '#0000FF' ? 'Blue' : 'Black'} Color`}
-                  />
-                ))}
+            {activeToolbarGroup === 'navigation' && (
+              <div className="flex items-center gap-2 ml-2 animate-fadeIn">
                 <button
-                  onClick={toggleEraser}
-                  className={`p-2 rounded-full ${isEraser ? 'bg-blue-100 text-blue-700 ring-2 ring-offset-1 ring-blue-500' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 flex items-center transition-colors`}
-                  title="Eraser"
+                  onClick={() => {
+                    const centerPosition = calculateCenterPosition();
+                    setPan({ x: centerPosition.x, y: centerPosition.y });
+                    setZoomLevel(centerPosition.zoom);
+                  }}
+                  className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors relative group"
                 >
-                  <Eraser className="w-4 h-4" />
+                  <Focus className="w-4 h-4" />
+                  <span className="text-sm font-medium whitespace-nowrap">Center</span>
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    Center and fit all columns
+                  </div>
+                </button>
+                
+                {/* Zoom controls */}
+                <button
+                  onClick={() => {
+                    const container = boardRef.current?.parentElement;
+                    if (!container) return;
+                    
+                    const rect = container.getBoundingClientRect();
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    const zoomFactor = 0.9;
+                    const newZoom = Math.max(0.5, zoomLevel * zoomFactor);
+                    
+                    const newPan = {
+                      x: pan.x + (centerX) * (1 - zoomFactor) / zoomLevel,
+                      y: pan.y + (centerY) * (1 - zoomFactor) / zoomLevel
+                    };
+                    
+                    setZoomLevel(newZoom);
+                    setPan(newPan);
+                  }}
+                  className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors relative group"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    Zoom Out
+                  </div>
+                </button>
+                
+                <div className="text-xs font-medium text-gray-500 whitespace-nowrap">
+                  {Math.round(zoomLevel * 100)}%
+                </div>
+                
+                <button
+                  onClick={() => {
+                    const container = boardRef.current?.parentElement;
+                    if (!container) return;
+                    
+                    const rect = container.getBoundingClientRect();
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    const zoomFactor = 1.1;
+                    const newZoom = Math.min(3, zoomLevel * zoomFactor);
+                    
+                    const newPan = {
+                      x: pan.x - (centerX) * (zoomFactor - 1) / zoomLevel,
+                      y: pan.y - (centerY) * (zoomFactor - 1) / zoomLevel
+                    };
+                    
+                    setZoomLevel(newZoom);
+                    setPan(newPan);
+                  }}
+                  className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors relative group"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    Zoom In
+                  </div>
                 </button>
               </div>
-              <select 
-                value={drawingWidth}
-                onChange={(e) => setDrawingWidth(Number(e.target.value))}
-                className="p-1 rounded bg-gray-50 text-xs h-8"
-                title="Line Width"
-              >
-                <option value="1">Thin</option>
-                <option value="3">Medium</option>
-                <option value="5">Thick</option>
-                <option value="8">Extra Thick</option>
-              </select>
-              {currentUser.isCreator && (
-                <button
-                  onClick={handleClearDrawings}
-                  className="p-2 rounded-full bg-red-50 text-red-700 hover:bg-red-100 flex items-center gap-1.5 transition-colors"
-                  title="Clear All Drawings"
+            )}
+          </div>
+          
+          {/* Drawing Group */}
+          <div className="flex items-center">
+            <button
+              onClick={() => {
+                if (activeToolbarGroup === 'drawing') {
+                  // If already open, close it and exit drawing mode
+                  setActiveToolbarGroup(null);
+                  setIsDrawingMode(false);
+                } else {
+                  // Close any other toolbar and open drawing
+                  setActiveToolbarGroup('drawing');
+                  setIsDrawingMode(true);
+                }
+              }}
+              className={`p-2 rounded-full ${isDrawingMode ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 hover:text-blue-700 flex items-center transition-colors relative group`}
+            >
+              <PencilLine className="w-4 h-4" />
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                {isDrawingMode ? "Exit Drawing Mode" : "Draw on Whiteboard"}
+              </div>
+            </button>
+            
+            {activeToolbarGroup === 'drawing' && (
+              <div className="h-full flex items-center gap-2 ml-2 animate-fadeIn">
+                <div className="flex gap-2 items-center">
+                  {DRAWING_COLORS.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        setDrawingColor(color);
+                        setIsEraser(false);
+                      }}
+                      className={`w-6 h-6 rounded-full cursor-pointer ${isEraser ? '' : drawingColor === color ? 'ring-2 ring-offset-1 ring-blue-500' : ''} relative group`}
+                      style={{ backgroundColor: color }}
+                    >
+                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                        Use {color === '#FF0000' ? 'Red' : color === '#0000FF' ? 'Blue' : 'Black'} Color
+                      </div>
+                    </button>
+                  ))}
+                  <button
+                    onClick={toggleEraser}
+                    className={`p-2 rounded-full ${isEraser ? 'bg-blue-100 text-blue-700 ring-2 ring-offset-1 ring-blue-500' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 flex items-center transition-colors relative group`}
+                  >
+                    <Eraser className="w-4 h-4" />
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                      {isEraser ? "Using Eraser" : "Switch to Eraser"}
+                    </div>
+                  </button>
+                </div>
+                <select 
+                  value={drawingWidth}
+                  onChange={(e) => setDrawingWidth(Number(e.target.value))}
+                  className="p-1 rounded bg-gray-50 text-xs h-8 relative group"
                 >
-                  <Eraser className="w-4 h-4" />
-                  <span className="text-sm font-medium whitespace-nowrap">Clear</span>
-                </button>
+                  <option value="1">Thin</option>
+                  <option value="3">Medium</option>
+                  <option value="5">Thick</option>
+                  <option value="8">Extra Thick</option>
+                </select>
+                {currentUser.isCreator && (
+                  <button
+                    onClick={handleClearDrawings}
+                    className="p-2 rounded-full bg-red-50 text-red-700 hover:bg-red-100 flex items-center gap-1.5 transition-colors relative group"
+                  >
+                    <Eraser className="w-4 h-4" />
+                    <span className="text-sm font-medium whitespace-nowrap">Clear</span>
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                      Clear All Drawings
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          
+          {/* Stickies Group - for columns and visibility */}
+          {currentUser.isCreator && !isVotingPhase && (
+            <div className="flex items-center">
+              <button
+                onClick={() => setActiveToolbarGroup(activeToolbarGroup === 'stickies' ? null : 'stickies')}
+                className={`p-2 rounded-full ${activeToolbarGroup === 'stickies' ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-gray-100 flex items-center transition-colors relative group`}
+              >
+                <StickyNoteIcon className="w-4 h-4" />
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                  Stickies Management
+                </div>
+              </button>
+              
+              {activeToolbarGroup === 'stickies' && (
+                <div className="flex items-center gap-2 ml-2 animate-fadeIn">
+                  <button
+                    onClick={handleAddColumn}
+                    className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors relative group"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-sm font-medium whitespace-nowrap">Add Column</span>
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                      Add a new column to the board
+                    </div>
+                  </button>
+                  
+                  {onToggleReveal && (
+                    <button
+                      onClick={onToggleReveal}
+                      className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors relative group"
+                    >
+                      {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      <span className="text-sm font-medium whitespace-nowrap">{isRevealed ? "Hide Stickies" : "Show Stickies"}</span>
+                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                        {isRevealed ? "Hide all sticky notes from other participants" : "Reveal all sticky notes"}
+                      </div>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
           
-          {/* Only show these buttons when NOT in drawing mode */}
-          {!isDrawingMode && (
-            <>
-              {currentUser.isCreator && !isVotingPhase && (
-                <button
-                  onClick={handleAddColumn}
-                  className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
-                  title="Add Column"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-sm font-medium whitespace-nowrap">Add Column</span>
-                </button>
-              )}
-              
-              {currentUser.isCreator && onToggleReveal && (
-                <>
-                  <div className="h-8 w-px bg-gray-200 mx-1"></div>
-                  <button
-                    onClick={onToggleReveal}
-                    className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 transition-colors"
-                    title={isRevealed ? "Hide Notes" : "Show Notes"}
-                  >
-                    {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    <span className="text-sm font-medium whitespace-nowrap">{isRevealed ? "Hide Notes" : "Show Notes"}</span>
-                  </button>
-                  
-                  <div className="h-8 w-px bg-gray-200 mx-1"></div>
-                  <button
-                    onClick={handleToggleVotingPhase}
-                    className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center gap-1.5 transition-colors`}
-                    title={isVotingPhase ? "End Voting" : "Start Voting"}
-                  >
-                    <ThumbsUp className="w-4 h-4" />
-                    <span className="text-sm font-medium whitespace-nowrap">{isVotingPhase ? "End Voting" : "Start Voting"}</span>
-                  </button>
-                  
-                  {isVotingPhase && (
-                    <button
-                      onClick={handleShowSummary}
-                      className="p-2 rounded-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 text-white hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 flex items-center gap-1.5 transition-colors"
-                      title="Generate AI Summary"
-                      style={{ 
-                        animation: 'gradientShift 3s ease infinite, glowPulse 2s ease-in-out infinite',
-                        backgroundSize: '200% 200%'
-                      }}
-                    >
-                      <Brain className="w-4 h-4" />
-                      <span className="text-sm font-medium whitespace-nowrap">AI Summary</span>
-                    </button>
-                  )}
-                </>
-              )}
-              
-              {!currentUser.isCreator && isVotingPhase && (
-                <div className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap">
-                  <ThumbsUp className="w-4 h-4" />
-                  <span>Voting in progress</span>
+          {/* Voting Group - always shows voting and AI summary */}
+          {currentUser.isCreator && onToggleReveal && (
+            <div className="flex items-center">
+              <button
+                onClick={() => setActiveToolbarGroup(activeToolbarGroup === 'voting' ? null : 'voting')}
+                className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center transition-colors relative group`}
+              >
+                <ThumbsUp className="w-4 h-4" />
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                  Voting Tools
                 </div>
-              )}
-            </>
+              </button>
+              
+              <div className={`flex items-center ml-2 ${activeToolbarGroup === 'voting' ? 'animate-fadeIn' : 'hidden'}`}>
+                <button
+                  onClick={handleToggleVotingPhase}
+                  className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center gap-1.5 transition-colors relative group`}
+                >
+                  <span className="text-sm font-medium whitespace-nowrap">{isVotingPhase ? "End Voting" : "Start Voting"}</span>
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    {isVotingPhase ? "End the voting session" : "Begin voting on sticky notes"}
+                  </div>
+                </button>
+                
+                <button
+                  onClick={handleShowSummary}
+                  className={`p-2 rounded-full ${!hasVotedStickies() ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 text-white hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500'} flex items-center gap-1.5 transition-colors ml-2 relative group`}
+                  disabled={!hasVotedStickies()}
+                  style={hasVotedStickies() ? { 
+                    animation: 'gradientShift 3s ease infinite, glowPulse 2s ease-in-out infinite',
+                    backgroundSize: '200% 200%'
+                  } : undefined}
+                >
+                  <Brain className="w-4 h-4" />
+                  <span className="text-sm font-medium whitespace-nowrap">AI Summary</span>
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    {!hasVotedStickies() 
+                      ? "At least one sticky note must have votes to generate summary" 
+                      : "Generate AI Summary"}
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Voting indicator for non-creators */}
+          {!currentUser.isCreator && isVotingPhase && (
+            <div className="flex items-center bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap relative group">
+              <ThumbsUp className="w-4 h-4 mr-1" />
+              <span>Voting active</span>
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                Voting is currently in progress
+              </div>
+            </div>
           )}
         </div>
 
