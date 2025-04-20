@@ -327,7 +327,8 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author,
           onClick={canEdit ? handleEditStart : undefined}
           className={`min-h-[3em] p-1 rounded ${!shouldShowContent && 'blur-sm'} ${
             canEdit && !isDragging ? 'cursor-text hover:bg-black/5' : ''
-          } overflow-hidden break-words`}
+          } break-words`}
+          style={{ whiteSpace: 'pre-wrap' }}
         >
           {getDisplayContent()}
         </div>

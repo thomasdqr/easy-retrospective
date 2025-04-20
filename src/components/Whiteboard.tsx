@@ -23,7 +23,8 @@ import {
   DrawingPath,
   clearAllDrawings,
   deleteDrawingPath,
-  subscribeToIcebreakerState
+  subscribeToIcebreakerState,
+  deleteStickyNote
 } from '../services/realtimeDbService';
 import { IcebreakerGameState } from './icebreaker/types';
 
@@ -708,6 +709,18 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     // Get board element position
     const boardRect = boardRef.current?.getBoundingClientRect();
     if (!boardRect) return;
+
+    // Check if the last sticky note created by the current user is empty
+    const userNotes = Object.values(stickyNotes)
+      .filter(note => note.authorId === currentUser.id);
+    
+    // If the user has at least one empty note, delete it before creating a new one
+    const emptyNotes = userNotes.filter(note => note.content === '');
+    if (emptyNotes.length > 0) {
+      // Get the most recently created empty note (assuming it's the last one in the array)
+      const lastEmptyNote = emptyNotes[emptyNotes.length - 1];
+      await deleteStickyNote(sessionId, lastEmptyNote.id);
+    }
 
     // Calculate position
     const mouseX = e.clientX - boardRect.left;
