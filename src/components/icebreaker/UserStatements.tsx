@@ -23,16 +23,22 @@ const UserStatements: React.FC<UserStatementsProps> = ({
   
   const myVote = userVotes[userId];
   const validUserIds = getValidUserIds(users);
-  const validUserCount = validUserIds.length;
+
+  // Get only users that exist in both the Firestore users list and the game state 
+  const activeUserIds = Object.keys(gameState.users).filter(id => validUserIds.includes(id));
 
   // Check if we're in voting phase by checking if all valid users have voted
-  const isVoting = !validUserIds.every(userId => {
-    const votesReceived = validUserIds.filter(voterId => 
+  const isVoting = !activeUserIds.every(userId => {
+    // Filter votes to only count those from active users
+    const votesReceived = activeUserIds.filter(voterId => 
       gameState.users[voterId]?.votes && 
       gameState.users[voterId].votes[userId] !== undefined &&
       voterId !== userId // excluding self-vote
     ).length;
-    return votesReceived >= validUserCount - 1; // excluding self-vote
+    
+    // Count only active users minus self
+    const requiredVotes = activeUserIds.filter(id => id !== userId).length;
+    return votesReceived >= requiredVotes;
   });
 
   const hasVotedForThisUser = myVote !== undefined;
@@ -41,8 +47,11 @@ const UserStatements: React.FC<UserStatementsProps> = ({
   // Count votes for each statement (only in results phase)
   const voteCount = !isVoting ? [0, 1, 2].map((originalIndex) => {
     if (!state.votes) return 0;
-    return validUserIds.filter(voterId => 
+    
+    // Only count votes from users who are still in the session
+    return activeUserIds.filter(voterId => 
       voterId !== userId && // exclude self
+      validUserIds.includes(voterId) && // ensure voter is a valid user
       state.votes[voterId] === originalIndex
     ).length;
   }) : [];
@@ -50,8 +59,9 @@ const UserStatements: React.FC<UserStatementsProps> = ({
   // For displaying correct guessers when revealed
   const correctGuessers = !isVoting && isRevealed ? Object.entries(state.votes || {})
     .filter(([voterId, voteIndex]) => {
-      // Only include valid users
-      if (!validUserIds.includes(voterId) || voterId === userId) return false;
+      // Only include valid users who are still in the session
+      if (!activeUserIds.includes(voterId) || voterId === userId) return false;
+      
       // Find which statement is the lie
       const lieIndex = Object.values(state.statements).findIndex(s => s.isLie);
       return voteIndex === lieIndex;

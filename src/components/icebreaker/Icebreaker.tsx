@@ -146,6 +146,67 @@ const Icebreaker: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, 
     }
   }, [sessionId, currentUser, users, gameState.users]);
 
+  // Add useEffect to clean up votes from removed users
+  useEffect(() => {
+    // Only creators can clean up votes
+    if (!currentUser.isCreator || !gameState.users || Object.keys(gameState.users).length === 0) return;
+
+    const validUserIds = getValidUserIds(users);
+    const gameStateUserIds = Object.keys(gameState.users);
+    
+    // Find users who exist in gameState but not in the valid users list
+    const removedUserIds = gameStateUserIds.filter(id => !validUserIds.includes(id));
+
+    const filteredUserVotes = Object.fromEntries(
+      Object.entries(userVotes).filter(([key]) => validUserIds.includes(key))
+    );
+    setUserVotes(filteredUserVotes);
+    
+    if (removedUserIds.length === 0) return; // No cleanup needed
+    
+    console.log("Cleaning up votes from removed users:", removedUserIds);
+    
+    // Create a copy of the game state
+    const updatedGameState = {...gameState};
+    
+    // For each active user in the game
+    gameStateUserIds.forEach(userId => {
+      // Skip if this user was also removed
+      if (removedUserIds.includes(userId)) return;
+      
+      const userState = {...updatedGameState.users[userId]};
+      let hasChanges = false;
+      
+      // If they have votes, remove votes for removed users
+      if (userState.votes) {
+        const updatedVotes = {...userState.votes};
+        
+        removedUserIds.forEach(removedId => {
+          if (updatedVotes[removedId] !== undefined) {
+            delete updatedVotes[removedId];
+            hasChanges = true;
+          }
+        });
+        
+        if (hasChanges) {
+          userState.votes = updatedVotes;
+          updatedGameState.users[userId] = userState;
+        }
+      }
+    });
+    
+    // Remove the removed users from the game state
+    removedUserIds.forEach(id => {
+      delete updatedGameState.users[id];
+    });
+    
+    // Only update if changes were made
+    if (removedUserIds.length > 0) {
+      console.log("Updating game state to remove data from removed users");
+      updateIcebreakerState(sessionId, updatedGameState);
+    }
+  }, [gameState, users, currentUser.isCreator, sessionId]);
+
   const handleSubmit = async () => {
     if (statements.some(s => !s.text.trim())) {
       alert('Please fill in all statements');
