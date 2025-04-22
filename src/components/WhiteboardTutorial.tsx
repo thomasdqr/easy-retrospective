@@ -128,7 +128,7 @@ function WhiteboardTutorial({
   return (
     <div className="fixed top-1/2 -translate-y-1/2 left-8 bg-white rounded-lg shadow-xl w-80 z-50 overflow-hidden">
       <div className="bg-indigo-600 text-white px-4 py-3 flex justify-between items-center">
-        <h3 className="font-medium">Interactive Tutorial</h3>
+        <h3 className="font-medium">Getting Started</h3>
         <div className="text-xs font-semibold">{completionPercentage}% complete</div>
       </div>
       
