@@ -30,6 +30,9 @@ import {
 } from '../services/realtimeDbService';
 import { IcebreakerGameState } from './icebreaker/types';
 
+// Tutorial localStorage key (same as in WhiteboardTutorial.tsx)
+const TUTORIAL_COMPLETED_KEY = 'whiteboard-tutorial-completed';
+
 interface WhiteboardProps {
   sessionId: string;
   currentUser: User;
@@ -114,7 +117,11 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
   
   // Tutorial state variables
-  const [showTutorial, setShowTutorial] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(() => {
+    // Check localStorage on component mount to determine if tutorial should be shown
+    const tutorialCompleted = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === 'true';
+    return !tutorialCompleted; // Only show if not completed
+  });
   const [hasPanned, setHasPanned] = useState(false);
   const [hasZoomed, setHasZoomed] = useState(false);
   const [hasStickyNoteCreated, setHasStickyNoteCreated] = useState(false);
@@ -981,6 +988,9 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   // Handle tutorial close
   const handleCloseTutorial = () => {
     setShowTutorial(false);
+    // We don't set localStorage here - that's handled in the WhiteboardTutorial component
+    // when the user clicks "Finish Tutorial" after completing all steps
+    // If they click "Skip Tutorial" the state won't be saved to localStorage
   };
 
   return (

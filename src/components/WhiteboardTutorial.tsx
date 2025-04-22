@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Move, ZoomIn, StickyNote as StickyNoteIcon } from 'lucide-react';
 
+// Storage key constant
+const TUTORIAL_COMPLETED_KEY = 'whiteboard-tutorial-completed';
+
 interface TutorialStep {
   id: string;
   title: string;
@@ -110,6 +113,18 @@ function WhiteboardTutorial({
   // Check if all steps are completed
   const allCompleted = completedSteps === steps.length;
 
+  // Handle completed tutorial
+  const handleFinishTutorial = () => {
+    // Save to localStorage that tutorial is completed
+    localStorage.setItem(TUTORIAL_COMPLETED_KEY, 'true');
+    onClose();
+  };
+
+  // Handle skipping tutorial without marking as completed
+  const handleSkipTutorial = () => {
+    onClose();
+  };
+
   return (
     <div className="fixed top-1/2 -translate-y-1/2 left-8 bg-white rounded-lg shadow-xl w-80 z-50 overflow-hidden">
       <div className="bg-indigo-600 text-white px-4 py-3 flex justify-between items-center">
@@ -158,7 +173,7 @@ function WhiteboardTutorial({
         {/* Buttons */}
         <div className="flex justify-between pt-2">
           <button
-            onClick={onClose}
+            onClick={handleSkipTutorial}
             className="text-gray-600 hover:text-gray-800 text-sm font-medium"
           >
             Skip Tutorial
@@ -166,7 +181,7 @@ function WhiteboardTutorial({
           
           {allCompleted && (
             <button
-              onClick={onClose}
+              onClick={handleFinishTutorial}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
             >
               Finish Tutorial
