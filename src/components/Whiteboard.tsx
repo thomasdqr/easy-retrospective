@@ -3,6 +3,7 @@ import { User, StickyNote, Column } from '../types';
 import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain, ZoomIn, ZoomOut, Move, StickyNoteIcon } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import RetroSummary from './RetroSummary';
+import WhiteboardTutorial from './WhiteboardTutorial';
 import { nanoid } from 'nanoid';
 import { 
   addStickyNote, 
@@ -111,6 +112,12 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
   const [isVotingPhase, setIsVotingPhase] = useState(false);
   const [voteLimit, setVoteLimit] = useState<number | null>(null);
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
+  
+  // Tutorial state variables
+  const [showTutorial, setShowTutorial] = useState(true);
+  const [hasPanned, setHasPanned] = useState(false);
+  const [hasZoomed, setHasZoomed] = useState(false);
+  const [hasStickyNoteCreated, setHasStickyNoteCreated] = useState(false);
   
   // Drawing states
   const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -588,6 +595,11 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
       lastPanPosition.current = { x: e.clientX, y: e.clientY };
       hasPannedRef.current = false;
     }
+    
+    // Add this at the end of the function after setting isPanning to track panning for tutorial
+    if (isPanning) {
+      hasPannedRef.current = true;
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -720,7 +732,16 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     setShowSummary(true);
   };
 
+  // Replace with this implementation to track active creation
+  const [initialNotesLoaded, setInitialNotesLoaded] = useState(false);
+  const previousNoteCount = useRef(0);
+  const userInitiatedAction = useRef(false);
+  
+  // Add this effect to detect actual add note action through handleAddNote
   const handleAddNote = async (e: React.MouseEvent) => {
+    // Mark that user initiated a sticky note creation
+    userInitiatedAction.current = true;
+    
     // Prevent adding notes during voting phase
     if (isVotingPhase) return;
     
@@ -772,6 +793,43 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     
     await addStickyNote(sessionId, note);
   };
+
+  // Check if user created a sticky note - improved detection
+  useEffect(() => {
+    const userNotes = Object.values(stickyNotes)
+      .filter(note => note.authorId === currentUser.id);
+    
+    // Track initial load of notes vs. user-created notes
+    if (!initialNotesLoaded) {
+      // First time loading notes from database - remember the count
+      previousNoteCount.current = userNotes.length;
+      setInitialNotesLoaded(true);
+    } else if (userNotes.length > previousNoteCount.current && userInitiatedAction.current) {
+      // Only count as completion if user actively created a note (not just loaded from DB)
+      setHasStickyNoteCreated(true);
+      previousNoteCount.current = userNotes.length;
+    }
+  }, [stickyNotes, currentUser.id, initialNotesLoaded]);
+
+  // Add trackpad panning detection
+  useEffect(() => {
+    if (!boardRef.current) return;
+    
+    // Track trackpad panning for tutorial
+    const handleTrackpadPan = (e: WheelEvent) => {
+      // Only count non-ctrl wheel events as panning (trackpad panning)
+      if (!e.ctrlKey && (Math.abs(e.deltaX) > 10 || Math.abs(e.deltaY) > 10)) {
+        setHasPanned(true);
+      }
+    };
+    
+    const boardElement = boardRef.current;
+    boardElement.addEventListener('wheel', handleTrackpadPan);
+    
+    return () => {
+      boardElement.removeEventListener('wheel', handleTrackpadPan);
+    };
+  }, []);
 
   // Add a new column
   const handleAddColumn = async () => {
@@ -913,6 +971,18 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     }, 0);
   };
 
+  // Update hasPanned when the user pans
+  useEffect(() => {
+    if (hasPannedRef.current) {
+      setHasPanned(true);
+    }
+  }, [hasPannedRef.current]);
+
+  // Handle tutorial close
+  const handleCloseTutorial = () => {
+    setShowTutorial(false);
+  };
+
   return (
     <div 
       className="relative w-full h-full flex flex-col" 
@@ -984,6 +1054,20 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Tutorial Component */}
+      {showTutorial && (
+        <WhiteboardTutorial
+          onClose={handleCloseTutorial}
+          zoomLevel={zoomLevel}
+          onPan={(value) => setHasPanned(value)}
+          hasPanned={hasPanned}
+          hasZoomed={hasZoomed}
+          onZoom={(value) => setHasZoomed(value)}
+          hasStickyNoteCreated={hasStickyNoteCreated}
+          onStickyNoteCreated={(value) => setHasStickyNoteCreated(value)}
+        />
       )}
       
       {/* Whiteboard */}
