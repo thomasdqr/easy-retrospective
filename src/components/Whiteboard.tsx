@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
-import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain, ZoomIn, ZoomOut, Move, StickyNoteIcon, VoteIcon, ThumbsUpIcon } from 'lucide-react';
+import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain, ZoomIn, ZoomOut, Move, StickyNoteIcon } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import RetroSummary from './RetroSummary';
 import { nanoid } from 'nanoid';
