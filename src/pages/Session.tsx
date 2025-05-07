@@ -9,11 +9,13 @@ import Timer from '../components/Timer';
 import VoteSummary from '../components/VoteSummary';
 import { Copy, EyeOff, ThumbsUp } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { subscribeToSessionBasicInfo, addUserToSession } from '../services/firebaseService';
+import { subscribeToSessionBasicInfo, addUserToSession, updateSessionBasicInfo } from '../services/firebaseService';
 import { subscribeToSessionRevealed, toggleSessionReveal, subscribeToIcebreakerState, subscribeToVotingPhase, subscribeToStickyNotes } from '../services/realtimeDbService';
 import { USER_SESSION_KEY } from '../constants';
 import { StickyNote } from '../types';
 import { IcebreakerType, DEFAULT_ICEBREAKER } from '../types/icebreaker';
+import { ref, onValue } from 'firebase/database';
+import { realtimeDb } from '../config/firebase';
 
 // Key for storing retrospective started status in localStorage
 const RETROSPECTIVE_STARTED_KEY = 'retrospective_started_';
@@ -31,6 +33,7 @@ function Session() {
   const [retrospectiveStarted, setRetrospectiveStarted] = useState(false);
   const [showVoteSummary, setShowVoteSummary] = useState(false);
   const [stickyNotes, setStickyNotes] = useState<Record<string, StickyNote>>({});
+  const [currentIcebreakerType, setCurrentIcebreakerType] = useState<IcebreakerType | undefined>(undefined);
 
   useEffect(() => {
     if (!sessionId) {
@@ -88,6 +91,15 @@ function Session() {
       }
     );
 
+    // Subscribe to icebreaker type from Realtime DB
+    const unsubscribeIcebreakerType = onValue(
+      ref(realtimeDb, `sessions/${sessionId}/icebreakerType`),
+      (snapshot) => {
+        const type = snapshot.val() as IcebreakerType | null;
+        setCurrentIcebreakerType(type || DEFAULT_ICEBREAKER);
+      }
+    );
+
     // Subscribe to voting phase status
     const unsubscribeVoting = subscribeToVotingPhase(
       sessionId,
@@ -128,6 +140,7 @@ function Session() {
       unsubscribeIcebreaker();
       unsubscribeVoting();
       unsubscribeStickyNotes();
+      unsubscribeIcebreakerType();
     };
   }, [sessionId, navigate]);
 
@@ -161,11 +174,13 @@ function Session() {
     
     setCurrentUser(user);
 
-    // If the user is a creator and specified an icebreaker type, update the session
+    // If the user is a creator and specified an icebreaker type, update both databases
     if (user.isCreator && icebreakerType) {
       try {
-        // Since we can't directly update icebreakerType with security rules,
-        // we'll add a reference to it in the realtime database
+        // Update Firestore
+        await updateSessionBasicInfo(sessionId, { icebreakerType });
+
+        // Update Realtime Database
         const { set, ref } = await import('firebase/database');
         const { realtimeDb } = await import('../config/firebase');
         const icebreakerTypeRef = ref(realtimeDb, `sessions/${sessionId}/icebreakerType`);
@@ -237,8 +252,8 @@ function Session() {
     // Check if the creator is the only person in the session
     const isCreatorAlone = currentUser?.isCreator && Object.keys(sessionBasicInfo.users || {}).length === 1;
     
-    // Get the icebreaker type from session info or use the default
-    const icebreakerType = sessionBasicInfo.icebreakerType || DEFAULT_ICEBREAKER;
+    // Use the current icebreaker type from Realtime DB
+    const icebreakerType = currentIcebreakerType || DEFAULT_ICEBREAKER;
 
     return (
       <div className="min-h-screen bg-linear-to-br from-indigo-100 to-purple-100">

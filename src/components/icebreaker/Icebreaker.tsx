@@ -11,7 +11,8 @@ const Icebreaker: React.FC<IcebreakerProps> = (props) => {
     case 'draw-your-weekend':
       return <DrawYourWeekend {...props} />;
     default:
-      return <TwoTruthsOneLie {...props} />;
+      console.error('Unknown icebreaker type:', props.icebreakerType);
+      return null;
   }
 };
 

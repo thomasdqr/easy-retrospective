@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { updateIcebreakerState, subscribeToIcebreakerState } from '../../../services/realtimeDbService';
+import { updateIcebreakerState, subscribeToIcebreakerState, IcebreakerState, IcebreakerPlayerState, IcebreakerStatement } from '../../../services/realtimeDbService';
 import { IcebreakerProps, Statement, IcebreakerGameState } from '../types';
 import { shuffleArray, checkAllSubmitted, checkAllVoted, isLastUser as checkIsLastUser, getValidUserIds } from '../utils';
 import { USER_SESSION_KEY } from '../../../constants';
@@ -15,6 +15,45 @@ import Leaderboard from '../Leaderboard';
 // Import firebase directly to add individual users
 import { ref, set } from 'firebase/database';
 import { realtimeDb } from '../../../config/firebase';
+
+// Helper function to convert game state to database state
+const convertToDbState = (state: IcebreakerGameState): IcebreakerState => {
+  const dbUsers: Record<string, IcebreakerPlayerState> = {};
+  
+  Object.entries(state.users).forEach(([userId, user]) => {
+    if (user.statements) {
+      const statements: { "0": IcebreakerStatement; "1": IcebreakerStatement; "2": IcebreakerStatement } = {
+        "0": user.statements["0"] || { text: "", isLie: false, revealed: false },
+        "1": user.statements["1"] || { text: "", isLie: false, revealed: false },
+        "2": user.statements["2"] || { text: "", isLie: true, revealed: false }
+      };
+      
+      // Create votes object with correct types
+      const typedVotes: Record<string, number> = {};
+      if (user.votes) {
+        Object.entries(user.votes).forEach(([voterId, vote]) => {
+          typedVotes[voterId] = typeof vote === 'string' ? parseInt(vote, 10) : vote as number;
+        });
+      }
+      
+      dbUsers[userId] = {
+        statements,
+        votes: typedVotes,
+        score: user.score || 0,
+        statementOrder: user.statementOrder || [0, 1, 2]
+      };
+    }
+  });
+  
+  return {
+    users: dbUsers,
+    activeUser: state.activeUser || null,
+    revealed: state.revealed || false,
+    finalLeaderboard: state.finalLeaderboard || false,
+    retrospectiveStarted: state.retrospectiveStarted || false,
+    completed: state.completed || false
+  };
+};
 
 const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, users, onComplete }) => {
   const [statements, setStatements] = useState<Statement[]>([
@@ -48,18 +87,36 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     const newState = {
       ...gameState,
       activeUser: userId,
-      revealed: false, // Reset revealed state when changing user
+      revealed: false,
       finalLeaderboard: false
     };
     
-    await updateIcebreakerState(sessionId, newState);
+    await updateIcebreakerState(sessionId, convertToDbState(newState));
   }, [currentUser.isCreator, gameState, sessionId]);
 
   useEffect(() => {
     console.log("Setting up subscription to icebreaker state");
     const unsubscribe = subscribeToIcebreakerState(sessionId, (state) => {
       if (state) {
-        setGameState(state);
+        // Convert database state to game state
+        const gameStateUpdate: IcebreakerGameState = {
+          users: Object.entries(state.users).reduce((acc, [userId, user]) => ({
+            ...acc,
+            [userId]: {
+              statements: user.statements,
+              votes: user.votes || {},
+              score: user.score || 0,
+              statementOrder: user.statementOrder
+            }
+          }), {}),
+          activeUser: state.activeUser,
+          revealed: state.revealed,
+          finalLeaderboard: state.finalLeaderboard,
+          retrospectiveStarted: state.retrospectiveStarted,
+          completed: state.completed
+        };
+        
+        setGameState(gameStateUpdate);
         
         // Update local vote tracking
         if (state.users && state.users[currentUser.id]?.votes) {
@@ -164,7 +221,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
               users: updatedUsers
             };
             
-            updateIcebreakerState(sessionId, newState);
+            updateIcebreakerState(sessionId, convertToDbState(newState));
           }
         });
     }
@@ -231,7 +288,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     // Only update if changes were made
     if (removedUserIds.length > 0) {
       console.log("Updating game state to remove data from removed users");
-      updateIcebreakerState(sessionId, updatedGameState);
+      updateIcebreakerState(sessionId, convertToDbState(updatedGameState));
     }
     
     // Update the ref after the effect runs
@@ -263,7 +320,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
       users: updatedUsers
     };
 
-    await updateIcebreakerState(sessionId, newState);
+    await updateIcebreakerState(sessionId, convertToDbState(newState));
   };
 
   const handleVote = async (userId: string, statementIndex: number) => {
@@ -294,7 +351,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
       users: updatedUsers
     };
 
-    await updateIcebreakerState(sessionId, newState);
+    await updateIcebreakerState(sessionId, convertToDbState(newState));
   };
   
   // Modify the showFinalLeaderboard function to prevent race conditions
@@ -303,19 +360,17 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     
     console.log("Showing leaderboard, current state:", gameState);
     
-    // Create a completely new state object with only the properties we need
     const newState = {
       users: {...gameState.users},
       activeUser: null,
       revealed: true,
       finalLeaderboard: true,
-      completed: true  // Add this to prevent any further state transitions
+      completed: true
     };
     
     console.log("New leaderboard state:", newState);
     
     try {
-      // Directly set the state locally first to prevent flickering
       setGameState(prev => ({
         ...prev,
         finalLeaderboard: true,
@@ -324,8 +379,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
         completed: true
       }));
       
-      // Then update the database
-      await updateIcebreakerState(sessionId, newState);
+      await updateIcebreakerState(sessionId, convertToDbState(newState));
     } catch (error) {
       console.error("Error showing leaderboard:", error);
     }
@@ -376,43 +430,37 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
   const handleReveal = useCallback(async () => {
     if (!currentUser.isCreator || !gameState.activeUser) return;
     
-    // If already revealed, just toggle the revealed state without recalculating scores
     if (gameState.revealed) {
       const newState = {
         ...gameState,
         revealed: true
       };
-      await updateIcebreakerState(sessionId, newState);
+      await updateIcebreakerState(sessionId, convertToDbState(newState));
       return;
     }
     
-    // Calculate which users voted correctly for this person's lie
     const activeUserState = gameState.users[gameState.activeUser];
-    if (!activeUserState) return;
+    if (!activeUserState || !activeUserState.statements) return;
     
-    // Find the index of the lie
     let lieIndex = -1;
     Object.entries(activeUserState.statements).forEach(([index, statement]) => {
-      if (statement.isLie) {
+      if (statement && statement.isLie) {
         lieIndex = parseInt(index);
       }
     });
     
     if (lieIndex === -1) return;
     
-    // Update scores for users who guessed correctly (only on first reveal)
     const updatedUsers = { ...gameState.users };
     const validUserIds = getValidUserIds(users);
     
-    // Only process votes from valid users
     validUserIds.forEach(userId => {
-      if (userId === gameState.activeUser) return; // Skip active user
+      if (userId === gameState.activeUser) return;
       
       const userState = updatedUsers[userId];
-      if (!userState) return; // Skip if user state doesn't exist
+      if (!userState) return;
       
       const userVote = activeUserState.votes?.[userId];
-      // If user voted for the correct lie
       if (userVote === lieIndex) {
         updatedUsers[userId] = {
           ...userState,
@@ -427,7 +475,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
       users: updatedUsers
     };
     
-    await updateIcebreakerState(sessionId, newState);
+    await updateIcebreakerState(sessionId, convertToDbState(newState));
   }, [currentUser.isCreator, gameState, sessionId, users]);
 
   // Replace the direct onComplete call with a synchronized database update
@@ -436,34 +484,28 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     
     console.log("Starting retrospective for all users");
     
-    // Update the state to notify all users
     const newState = {
       ...gameState,
       retrospectiveStarted: true
     };
     
     try {
-      // Disable the button to prevent multiple clicks
       const button = document.querySelector('#start-retrospective-button');
       if (button) {
         button.setAttribute('disabled', 'true');
         (button as HTMLButtonElement).textContent = 'Starting...';
       }
       
-      // Update the database first
-      await updateIcebreakerState(sessionId, newState);
+      await updateIcebreakerState(sessionId, convertToDbState(newState));
       
-      // Then update local state to show the loading indicator
       setGameState(prev => ({
         ...prev,
         retrospectiveStarted: true
       }));
       
-      // onComplete will be called via the useEffect hook after the state update propagates
     } catch (error) {
       console.error("Error starting retrospective:", error);
       
-      // Re-enable the button in case of error
       const button = document.querySelector('#start-retrospective-button');
       if (button) {
         button.removeAttribute('disabled');
@@ -568,6 +610,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
                     handleNextUser={handleNextUser}
                     handleShowLeaderboard={handleShowLeaderboard}
                     isLastUser={isLastUser}
+                    icebreakerType="two-truths-one-lie"
                   />
                   
                   {/* Active user statements */}

@@ -7,43 +7,53 @@ export interface Statement {
   revealed: boolean;
 }
 
+export interface Drawing {
+  imageData: string;
+  description: string;
+  revealed: boolean;
+  correctGuesses: { [userId: string]: boolean };
+}
+
 export interface PlayerState {
-  statements: {
-    "0": Statement;
-    "1": Statement;
-    "2": Statement;
+  statements?: {
+    [key: string]: Statement;
   };
-  votes: Record<string, number>; // userId -> statementIndex voted as lie
-  score?: number;
-  statementOrder?: number[]; // Shuffled order of statements [0,1,2]
+  drawing?: Drawing;
+  votes?: { [voterId: string]: string | number };
+  score: number;
+  statementOrder?: number[];
 }
 
 export interface IcebreakerGameState {
-  users: Record<string, PlayerState>;
+  users: {
+    [userId: string]: PlayerState;
+  };
   activeUser: string | null;
   revealed: boolean;
-  completed?: boolean;
   finalLeaderboard?: boolean;
   retrospectiveStarted?: boolean;
+  completed?: boolean;
 }
 
 export interface IcebreakerProps {
   sessionId: string;
   currentUser: User;
-  users: Record<string, User>;
+  users: { [key: string]: User };
   onComplete: () => void;
-  icebreakerType: IcebreakerType;
+  icebreakerType?: IcebreakerType;
 }
 
 // Interfaces for component props
 export interface SubmissionFormProps {
-  statements: Statement[];
-  setStatements: React.Dispatch<React.SetStateAction<Statement[]>>;
+  statements?: Statement[];
+  setStatements?: (statements: Statement[]) => void;
+  drawing?: Drawing;
+  setDrawing?: (drawing: Drawing) => void;
   onSubmit: () => void;
 }
 
 export interface WaitingRoomProps {
-  users: Record<string, User>;
+  users: { [key: string]: User };
   gameState: IcebreakerGameState;
 }
 
@@ -51,19 +61,23 @@ export interface UserStatementsProps {
   userId: string;
   gameState: IcebreakerGameState;
   currentUser: User;
-  users: Record<string, User>;
-  userVotes: Record<string, number>;
-  handleVote: (userId: string, statementIndex: number) => void;
+  users: { [key: string]: User };
+  userVotes?: { [key: string]: number };
+  userGuesses?: { [key: string]: string };
+  handleVote?: (userId: string, vote: number) => void;
+  handleGuess?: (userId: string, guess: string) => void;
+  sessionId?: string;
 }
 
 export interface ResultsNavigationProps {
   gameState: IcebreakerGameState;
   currentUser: User;
-  users: Record<string, User>;
+  users: { [key: string]: User };
   handlePrevUser: () => void;
   handleNextUser: () => void;
   handleShowLeaderboard: () => void;
   isLastUser: boolean;
+  icebreakerType?: IcebreakerType;
 }
 
 export interface RevealButtonProps {
@@ -75,6 +89,6 @@ export interface RevealButtonProps {
 export interface LeaderboardProps {
   gameState: IcebreakerGameState;
   currentUser: User;
-  users: Record<string, User>;
+  users: { [key: string]: User };
   handleStartRetrospective: () => void;
 } 

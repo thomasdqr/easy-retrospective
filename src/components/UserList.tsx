@@ -1,11 +1,27 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { User } from '../types';
 import { removeUserFromSession } from '../services/firebaseService';
 import { UserMinus } from 'lucide-react';
 import { subscribeToIcebreakerState } from '../services/realtimeDbService';
 import { useEffect, useState } from 'react';
 import { getValidUserIds } from '../components/icebreaker/utils';
-import { IcebreakerGameState, Statement } from '../components/icebreaker/types';
+import { IcebreakerGameState, Statement, PlayerState } from '../components/icebreaker/types';
+import { Drawing } from '../components/icebreaker/types';
+
+interface ExtendedPlayerState extends PlayerState {
+  drawing?: Drawing;
+  statements?: {
+    "0": Statement;
+    "1": Statement;
+    "2": Statement;
+  };
+  votes: Record<string, string | number>;
+  score: number;
+}
+
+interface ExtendedGameState extends Omit<IcebreakerGameState, 'users'> {
+  users: Record<string, ExtendedPlayerState>;
+}
 
 interface UserListProps {
   users: Record<string, User>;
@@ -14,34 +30,59 @@ interface UserListProps {
 }
 
 function UserList({ users, sessionId, currentUser }: UserListProps) {
-  const [gameState, setGameState] = useState<IcebreakerGameState | null>(null);
+  const [gameState, setGameState] = useState<ExtendedGameState | null>(null);
   const [isIcebreakerVotingPhase, setIsIcebreakerVotingPhase] = useState(false);
 
   // Subscribe to icebreaker game state to get voting information
   useEffect(() => {
     const unsubscribe = subscribeToIcebreakerState(sessionId, (state) => {
       if (state) {
-        setGameState(state);
+        // Convert the state to our extended type
+        const extendedState: ExtendedGameState = {
+          ...state,
+          users: state.users as Record<string, ExtendedPlayerState>
+        };
+        setGameState(extendedState);
         
         // Check if we're in the voting phase (all users have submitted but not all have voted)
         const validUserIds = getValidUserIds(users);
+        
+        // Check if all users have submitted
+        const allSubmitted = validUserIds.every(userId => {
+          const userState = extendedState.users[userId];
+          if (!userState) return false;
+          
+          // Check for either statements (TwoTruthsOneLie) or drawing (DrawYourWeekend)
+          let hasSubmitted = false;
+          
+          if (userState.metadata?.type === 'drawing') {
+            // For DrawYourWeekend, check the metadata
+            const drawingData = userState.metadata.data;
+            hasSubmitted = drawingData && drawingData.imageData !== '' && drawingData.description.trim() !== '';
+          } else if (userState.statements) {
+            // For TwoTruthsOneLie, check statements
+            hasSubmitted = Object.values(userState.statements).every(
+              (s: Statement) => s && s.text && s.text.trim().length > 0
+            );
+          }
+          
+          return hasSubmitted;
+        });
+
+
+        // Check if all votes are complete
         const allVotesComplete = validUserIds.every(userId => {
-          const votesReceived = validUserIds.filter(voterId => 
-            state.users[voterId]?.votes && 
-            state.users[voterId].votes[userId] !== undefined &&
-            voterId !== userId // excluding self-vote
-          ).length;
-          return votesReceived >= validUserIds.length - 1; // excluding self-vote
+          const votesReceived = validUserIds.filter(voterId => {
+            if (voterId === userId) return false;
+            const voterState = extendedState.users[voterId];
+            return voterState?.votes && voterState.votes[userId] !== undefined;
+          }).length;
+          
+          return votesReceived >= validUserIds.length - 1;
         });
         
-        const allSubmitted = validUserIds.every(userId => 
-          state.users[userId]?.statements && 
-          Object.values(state.users[userId]?.statements).every(
-            (s: Statement) => s && s.text && s.text.trim().length > 0
-          )
-        );
-        
-        setIsIcebreakerVotingPhase(allSubmitted && !allVotesComplete);
+        const isVotingPhase = allSubmitted && !allVotesComplete;
+        setIsIcebreakerVotingPhase(isVotingPhase);
       }
     });
 
@@ -62,26 +103,20 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
 
   // Function to get voting progress for a user during the icebreaker voting phase
   const getVotingProgress = (userId: string) => {
-    if (!gameState || !gameState.users || !isIcebreakerVotingPhase) return null;
     
-    // Get only users that are still in the session (not kicked or removed)
+    if (!gameState || !gameState.users || !isIcebreakerVotingPhase) {
+
+      return null;
+    }
+    
     const actualValidUserIds = getValidUserIds(users);
-    
-    // Filter for users that are valid in both Firestore and the game state
-    const activeUserIds = Object.keys(gameState.users).filter(id => 
-      actualValidUserIds.includes(id) && id !== userId
-    );
-    
-    // Total possible votes is the number of other active users (excluding self)
+    const activeUserIds = actualValidUserIds.filter(id => id !== userId);
     const totalPossibleVotes = activeUserIds.length;
     
-    // Count votes CAST by this user by checking all other users' vote records
-    // A user casts a vote by choosing which statement is a lie for another user
     let votesCast = 0;
     activeUserIds.forEach(targetUserId => {
-      // If the target user has votes and this user has voted for one of their statements
-      if (gameState.users[targetUserId]?.votes && 
-          gameState.users[targetUserId].votes[userId] !== undefined) {
+      const targetUserState = gameState.users[targetUserId];
+      if (targetUserState?.votes && targetUserState.votes[userId] !== undefined) {
         votesCast++;
       }
     });

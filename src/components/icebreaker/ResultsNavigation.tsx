@@ -8,7 +8,8 @@ const ResultsNavigation: React.FC<ResultsNavigationProps> = ({
   handlePrevUser,
   handleNextUser,
   handleShowLeaderboard,
-  isLastUser
+  isLastUser,
+  icebreakerType = 'two-truths-one-lie'
 }) => {
   return (
     <div className="flex justify-between items-center mb-6">
@@ -25,7 +26,9 @@ const ResultsNavigation: React.FC<ResultsNavigationProps> = ({
       
       <span className="font-medium text-gray-700">
         {gameState.activeUser && users[gameState.activeUser] 
-          ? `Showing ${gameState.revealed ? 'results' : 'votes'} for ${users[gameState.activeUser].name}`
+          ? icebreakerType === 'two-truths-one-lie'
+            ? `Showing ${gameState.revealed ? 'results' : 'votes'} for ${users[gameState.activeUser].name}`
+            : `Showing ${gameState.revealed ? 'results with correct guesses' : 'guesses'} for ${users[gameState.activeUser].name}`
           : 'Waiting for results...'}
       </span>
       

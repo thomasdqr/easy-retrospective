@@ -28,8 +28,11 @@
           ".read": true,
           ".write": true,
           "users": {
+            ".read": true,
+            ".write": true,
             "$userId": {
-              ".validate": "newData.hasChildren(['statements']) && newData.child('statements').hasChildren() && newData.child('statements').hasChildren(['0', '1', '2']) && newData.child('statements/0').hasChildren(['text', 'isLie', 'revealed']) && newData.child('statements/1').hasChildren(['text', 'isLie', 'revealed']) && newData.child('statements/2').hasChildren(['text', 'isLie', 'revealed'])"
+              ".read": true,
+              ".write": true
             }
           },
           "activeUser": {

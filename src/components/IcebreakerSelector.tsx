@@ -1,4 +1,3 @@
-import React from 'react';
 import { IcebreakerType, ICEBREAKER_TYPES } from '../types/icebreaker';
 
 interface IcebreakerSelectorProps {

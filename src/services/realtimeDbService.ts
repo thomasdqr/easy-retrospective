@@ -12,24 +12,24 @@ interface CursorData {
   lastUpdate: number;
 }
 
-interface IcebreakerStatement {
+export interface IcebreakerStatement {
   text: string;
   isLie: boolean;
   revealed: boolean;
 }
 
-interface IcebreakerPlayerState {
+export interface IcebreakerPlayerState {
   statements: {
     "0": IcebreakerStatement;
     "1": IcebreakerStatement;
     "2": IcebreakerStatement;
   };
-  votes: Record<string, number>; // userId -> statementIndex voted as lie
+  votes: Record<string, number | string>; // userId -> statementIndex voted as lie or guess text
   score?: number;
   statementOrder?: number[]; // Order of statements for this player (shuffled)
 }
 
-interface IcebreakerState {
+export interface IcebreakerState {
   users: Record<string, IcebreakerPlayerState>;
   activeUser: string | null;
   revealed: boolean;
