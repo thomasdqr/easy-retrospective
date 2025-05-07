@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { User } from '../types';
 import { removeUserFromSession } from '../services/firebaseService';
-import { UserMinus } from 'lucide-react';
+import { UserMinus, ChevronUp, ChevronDown } from 'lucide-react';
 import { subscribeToIcebreakerState } from '../services/realtimeDbService';
 import { useEffect, useState } from 'react';
 import { getValidUserIds } from '../components/icebreaker/utils';
@@ -32,6 +32,7 @@ interface UserListProps {
 function UserList({ users, sessionId, currentUser }: UserListProps) {
   const [gameState, setGameState] = useState<ExtendedGameState | null>(null);
   const [isIcebreakerVotingPhase, setIsIcebreakerVotingPhase] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Subscribe to icebreaker game state to get voting information
   useEffect(() => {
@@ -135,54 +136,75 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-lg shadow-lg p-4 w-full border border-gray-100">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Participants</h3>
-      <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-        {sortedUsers.map((user) => {
-          // Get voting progress for user in icebreaker voting phase
-          const votingProgress = getVotingProgress(user.id);
-          
-          return (
-            <div key={user.id} className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-8 h-8 rounded-full bg-gray-100"
-                />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    
-                    {/* Show voting progress during icebreaker voting phase */}
-                    {votingProgress && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        votingProgress.votesCast === votingProgress.totalPossibleVotes 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {votingProgress.votesCast}/{votingProgress.totalPossibleVotes}
-                      </span>
+    <div className={`bg-white/80 backdrop-blur-sm rounded-lg shadow-lg ${isCollapsed ? 'p-2 max-w-[200px] ml-auto' : 'p-4 w-full'} border border-gray-100 transition-all duration-200`}>
+      <div className="flex items-center justify-between">
+        <h3 className={`font-semibold text-gray-900 ${isCollapsed ? 'text-sm' : 'text-lg'}`}>
+          {isCollapsed ? (
+            <span className="flex items-center gap-1">
+              <span>{sortedUsers.length}</span>
+              <span className="text-xs text-gray-500">participant{sortedUsers.length !== 1 ? 's' : ''}</span>
+            </span>
+          ) : (
+            `Participants (${sortedUsers.length})`
+          )}
+        </h3>
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)} 
+          className="text-gray-500 hover:text-indigo-600 transition-colors p-1"
+          aria-label={isCollapsed ? "Expand participants list" : "Collapse participants list"}
+        >
+          {isCollapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-5 h-5" />}
+        </button>
+      </div>
+      
+      {!isCollapsed && (
+        <div className="space-y-3 max-h-[50vh] overflow-y-auto mt-3">
+          {sortedUsers.map((user) => {
+            // Get voting progress for user in icebreaker voting phase
+            const votingProgress = getVotingProgress(user.id);
+            
+            return (
+              <div key={user.id} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="w-8 h-8 rounded-full bg-gray-100"
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                      
+                      {/* Show voting progress during icebreaker voting phase */}
+                      {votingProgress && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          votingProgress.votesCast === votingProgress.totalPossibleVotes 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {votingProgress.votesCast}/{votingProgress.totalPossibleVotes}
+                        </span>
+                      )}
+                    </div>
+                    {user.isCreator && (
+                      <span className="text-xs text-indigo-600">Creator</span>
                     )}
                   </div>
-                  {user.isCreator && (
-                    <span className="text-xs text-indigo-600">Creator</span>
-                  )}
                 </div>
+                {currentUser.isCreator && !user.isCreator && (
+                  <button
+                    onClick={() => handleKickUser(user.id)}
+                    className="p-1 text-gray-500 hover:text-red-600 transition-colors"
+                    title="Kick user"
+                  >
+                    <UserMinus className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              {currentUser.isCreator && !user.isCreator && (
-                <button
-                  onClick={() => handleKickUser(user.id)}
-                  className="p-1 text-gray-500 hover:text-red-600 transition-colors"
-                  title="Kick user"
-                >
-                  <UserMinus className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
