@@ -27,6 +27,7 @@ export interface IcebreakerPlayerState {
   votes: Record<string, number | string>; // userId -> statementIndex voted as lie or guess text
   score?: number;
   statementOrder?: number[]; // Order of statements for this player (shuffled)
+  revealed?: boolean; // Whether this user's statements have been revealed
 }
 
 export interface IcebreakerState {
