@@ -223,7 +223,7 @@ function Session() {
     const isCreatorAlone = currentUser?.isCreator && Object.keys(sessionBasicInfo.users || {}).length === 1;
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
+      <div className="min-h-screen bg-linear-to-br from-indigo-100 to-purple-100">
         <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4">
           <div className="flex justify-between items-center mx-1">
             <div className="flex items-center">
@@ -296,7 +296,7 @@ function Session() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100">
+    <div className="min-h-screen bg-linear-to-br from-indigo-100 to-purple-100">
       <div className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
         <div className="flex justify-between items-center mx-1">
           <div className="flex items-center">

@@ -45,7 +45,7 @@ function Home() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-100 to-purple-100">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-indigo-100 to-purple-100">
       <div className="max-w-2xl w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 bg-indigo-100 rounded-full flex items-center justify-center">

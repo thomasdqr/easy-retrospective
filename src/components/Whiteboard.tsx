@@ -1087,7 +1087,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
-        className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative flex-grow"
+        className="w-full h-full bg-white rounded-lg shadow-lg overflow-hidden cursor-default relative grow"
         style={{
           cursor: isDrawingMode ? 'crosshair' : isPanning ? 'grabbing' : 'default',
           overscrollBehavior: 'none',
@@ -1103,7 +1103,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
               className={`p-2 rounded-full ${activeToolbarGroup === 'navigation' ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-gray-100 flex items-center transition-colors relative group`}
             >
               <Move className="w-4 h-4" />
-              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                 Navigation Tools
               </div>
             </button>
@@ -1120,7 +1120,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                 >
                   <Focus className="w-4 h-4" />
                   <span className="text-sm font-medium whitespace-nowrap">Center</span>
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                     Center and fit all columns
                   </div>
                 </button>
@@ -1149,7 +1149,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors relative group"
                 >
                   <ZoomOut className="w-4 h-4" />
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                     Zoom Out
                   </div>
                 </button>
@@ -1181,7 +1181,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   className="p-2 rounded-full bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center transition-colors relative group"
                 >
                   <ZoomIn className="w-4 h-4" />
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                     Zoom In
                   </div>
                 </button>
@@ -1206,7 +1206,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
               className={`p-2 rounded-full ${isDrawingMode ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 hover:text-blue-700 flex items-center transition-colors relative group`}
             >
               <PencilLine className="w-4 h-4" />
-              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                 {isDrawingMode ? "Exit Drawing Mode" : "Draw on Whiteboard"}
               </div>
             </button>
@@ -1224,7 +1224,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                       className={`w-6 h-6 rounded-full cursor-pointer ${isEraser ? '' : drawingColor === color ? 'ring-2 ring-offset-1 ring-blue-500' : ''} relative group`}
                       style={{ backgroundColor: color }}
                     >
-                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                         Use {color === '#FF0000' ? 'Red' : color === '#0000FF' ? 'Blue' : 'Black'} Color
                       </div>
                     </button>
@@ -1234,7 +1234,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                     className={`p-2 rounded-full ${isEraser ? 'bg-blue-100 text-blue-700 ring-2 ring-offset-1 ring-blue-500' : 'bg-gray-50 text-gray-700'} hover:bg-blue-100 flex items-center transition-colors relative group`}
                   >
                     <Eraser className="w-4 h-4" />
-                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                       {isEraser ? "Using Eraser" : "Switch to Eraser"}
                     </div>
                   </button>
@@ -1256,7 +1256,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   >
                     <Eraser className="w-4 h-4" />
                     <span className="text-sm font-medium whitespace-nowrap">Clear</span>
-                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                       Clear All Drawings
                     </div>
                   </button>
@@ -1273,7 +1273,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                 className={`p-2 rounded-full ${activeToolbarGroup === 'stickies' ? 'bg-blue-100 text-blue-700' : 'bg-gray-50 text-gray-700'} hover:bg-gray-100 flex items-center transition-colors relative group`}
               >
                 <StickyNoteIcon className="w-4 h-4" />
-                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                   Stickies Management
                 </div>
               </button>
@@ -1286,7 +1286,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   >
                     <Plus className="w-4 h-4" />
                     <span className="text-sm font-medium whitespace-nowrap">Add Column</span>
-                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                       Add a new column to the board
                     </div>
                   </button>
@@ -1298,7 +1298,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                     >
                       {isRevealed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       <span className="text-sm font-medium whitespace-nowrap">{isRevealed ? "Hide Stickies" : "Show Stickies"}</span>
-                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                         {isRevealed ? "Hide all sticky notes from other participants" : "Reveal all sticky notes"}
                       </div>
                     </button>
@@ -1316,7 +1316,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                 className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center transition-colors relative group`}
               >
                 <ThumbsUp className="w-4 h-4" />
-                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                   Voting Tools
                 </div>
               </button>
@@ -1327,14 +1327,14 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   className={`p-2 rounded-full ${isVotingPhase ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-700'} hover:bg-indigo-100 hover:text-indigo-700 flex items-center gap-1.5 transition-colors relative group`}
                 >
                   <span className="text-sm font-medium whitespace-nowrap">{isVotingPhase ? "End Voting" : "Start Voting"}</span>
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                     {isVotingPhase ? "End the voting session" : "Begin voting on sticky notes"}
                   </div>
                 </button>
                 
                 <button
                   onClick={handleShowSummary}
-                  className={`p-2 rounded-full ${!hasVotedStickies() ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 text-white hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500'} flex items-center gap-1.5 transition-colors ml-2 relative group`}
+                  className={`p-2 rounded-full ${!hasVotedStickies() ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-linear-to-r from-indigo-400 via-purple-400 to-pink-400 text-white hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500'} flex items-center gap-1.5 transition-colors ml-2 relative group`}
                   disabled={!hasVotedStickies()}
                   style={hasVotedStickies() ? { 
                     animation: 'gradientShift 3s ease infinite, glowPulse 2s ease-in-out infinite',
@@ -1343,7 +1343,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                 >
                   <Brain className="w-4 h-4" />
                   <span className="text-sm font-medium whitespace-nowrap">AI Summary</span>
-                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+                  <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                     {!hasVotedStickies() 
                       ? "At least one sticky note must have votes to generate summary" 
                       : "Generate AI Summary"}
@@ -1363,7 +1363,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   {getUserVoteCount()}/{voteLimit} votes
                 </span>
               )}
-              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                 Voting is currently in progress
                 {voteLimit !== null && ` - You can use up to ${voteLimit} votes`}
               </div>
@@ -1380,7 +1380,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
                   {getUserVoteCount()}/{voteLimit} votes
                 </span>
               )}
-              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]">
+              <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-100">
                 {voteLimit !== null 
                   ? `Each user has ${voteLimit} votes to distribute` 
                   : "Users have unlimited votes"}

@@ -152,7 +152,7 @@ function WhiteboardTutorial({
                   : 'border-gray-200 bg-gray-50'
               }`}
             >
-              <div className={`flex-shrink-0 rounded-full p-2 mr-3 ${
+              <div className={`shrink-0 rounded-full p-2 mr-3 ${
                 step.isCompleted ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-600'
               }`}>
                 {step.icon}
