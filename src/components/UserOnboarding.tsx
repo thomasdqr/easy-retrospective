@@ -3,9 +3,11 @@ import { createAvatar } from '@dicebear/core';
 import { lorelei } from '@dicebear/collection';
 import { User } from '../types';
 import { Sliders, Shuffle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import IcebreakerSelector from './IcebreakerSelector';
+import { IcebreakerType, DEFAULT_ICEBREAKER } from '../types/icebreaker';
 
 interface UserOnboardingProps {
-  onComplete: (user: Omit<User, 'id'>) => void;
+  onComplete: (user: Omit<User, 'id'>, icebreakerType?: IcebreakerType) => void;
   isCreator?: boolean;
 }
 
@@ -75,6 +77,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
   const [name, setName] = useState('');
   const [seed, setSeed] = useState(() => Math.random().toString(36).substring(7));
   const [showCustomization, setShowCustomization] = useState(false);
+  const [icebreakerType, setIcebreakerType] = useState<IcebreakerType>(DEFAULT_ICEBREAKER);
   
   // Customization options
   const [hairColor, setHairColor] = useState(HAIR_COLORS[0].value);
@@ -287,7 +290,7 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
         name: name.trim(),
         avatar: generateAvatar(seed),
         isCreator
-      });
+      }, isCreator ? icebreakerType : undefined);
     }
   };
 
@@ -537,13 +540,22 @@ function UserOnboarding({ onComplete, isCreator = false }: UserOnboardingProps) 
               )}
             </div>
           </div>
+          
+          {isCreator && (
+            <IcebreakerSelector 
+              selectedType={icebreakerType}
+              onChange={setIcebreakerType}
+            />
+          )}
 
-          <button
-            type="submit"
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-          >
-            Join Session
-          </button>
+          <div>
+            <button
+              type="submit"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              {isCreator ? 'Create Session' : 'Join Session'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

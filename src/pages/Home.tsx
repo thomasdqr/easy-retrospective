@@ -1,17 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
-import { History } from 'lucide-react';
 import { createSession } from '../services/firebaseService';
 import { cleanupOldSessions } from '../services/sessionCleanupService';
 import { useState } from 'react';
 import favicon from '../assets/favicon.png';
 
-
 function Home() {
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
-
-
 
   const createNewSession = async () => {
     try {

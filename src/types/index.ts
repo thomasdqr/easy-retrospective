@@ -1,3 +1,5 @@
+import { IcebreakerType } from './icebreaker';
+
 export interface User {
   id: string;
   name: string;
@@ -32,6 +34,7 @@ export interface SessionBasicInfo {
   id: string;
   createdAt: number;
   users: Record<string, User>;
+  icebreakerType?: IcebreakerType;
 }
 
 export interface SessionState {

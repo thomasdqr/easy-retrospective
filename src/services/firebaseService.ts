@@ -1,6 +1,7 @@
 import { doc, setDoc, updateDoc, onSnapshot, Unsubscribe, deleteField } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { User } from '../types';
+import { IcebreakerType, DEFAULT_ICEBREAKER } from '../types/icebreaker';
 
 // Cache for active subscriptions to avoid duplicate subscriptions
 const activeSubscriptions: Record<string, Unsubscribe> = {};
@@ -10,6 +11,7 @@ type SessionBasicInfoCache = {
   id: string;
   createdAt: number;
   users: Record<string, User>;
+  icebreakerType?: IcebreakerType;
 };
 
 const sessionCache: Record<string, SessionBasicInfoCache> = {};
@@ -20,7 +22,7 @@ const sessionCache: Record<string, SessionBasicInfoCache> = {};
  */
 export const subscribeToSessionBasicInfo = (
   sessionId: string,
-  onSessionBasicInfoUpdate: (sessionBasicInfo: { id: string, createdAt: number, users: Record<string, User> }) => void,
+  onSessionBasicInfoUpdate: (sessionBasicInfo: { id: string, createdAt: number, users: Record<string, User>, icebreakerType?: IcebreakerType }) => void,
   onError: (error: Error) => void
 ): Unsubscribe => {
   // Re-use existing subscription if available
@@ -44,7 +46,8 @@ export const subscribeToSessionBasicInfo = (
       const basicInfo = {
         id: data.id,
         createdAt: data.createdAt,
-        users: data.users || {}
+        users: data.users || {},
+        icebreakerType: data.icebreakerType
       };
       
       // Only update if data has changed
@@ -72,29 +75,53 @@ export const subscribeToSessionBasicInfo = (
 /**
  * Create a new session with basic info only
  */
-export const createSession = async (sessionId: string): Promise<boolean> => {
+export const createSession = async (sessionId: string, icebreakerType: IcebreakerType = DEFAULT_ICEBREAKER): Promise<boolean> => {
   try {
     const sessionData = {
       id: sessionId,
       createdAt: Date.now(),
-      users: {}
+      users: {},
+      icebreakerType
     };
     
+    console.log('Creating Firestore document with data:', sessionData);
     await setDoc(doc(db, 'sessions', sessionId), sessionData);
+    console.log('Firestore document created successfully');
     
     // Also initialize revealed status in realtime DB
-    // Import is placed here to avoid circular dependency
-    const { set, ref, get } = await import('firebase/database');
-    const { realtimeDb } = await import('../config/firebase');
-    const revealedRef = ref(realtimeDb, `sessions/${sessionId}/isRevealed`);
-    await set(revealedRef, true);
+    try {
+      // Import is placed here to avoid circular dependency
+      const { set, ref } = await import('firebase/database');
+      const { realtimeDb } = await import('../config/firebase');
+      
+      console.log('Setting up Realtime DB path:', `sessions/${sessionId}/isRevealed`);
+      const revealedRef = ref(realtimeDb, `sessions/${sessionId}/isRevealed`);
+      await set(revealedRef, true);
+      
+      // Also set the icebreakerType in the Realtime DB
+      console.log('Setting up Realtime DB path:', `sessions/${sessionId}/icebreakerType`);
+      const icebreakerTypeRef = ref(realtimeDb, `sessions/${sessionId}/icebreakerType`);
+      await set(icebreakerTypeRef, icebreakerType);
+      
+      console.log('Realtime DB setup completed successfully');
+    } catch (rtdbError) {
+      console.error('Error setting up Realtime Database:', rtdbError);
+      // Continue to verify Firestore document even if Realtime DB setup fails
+    }
 
     // Verify the session was actually created in Firestore
-    const { getDoc } = await import('firebase/firestore');
-    const sessionDoc = doc(db, 'sessions', sessionId);
-    const docSnap = await getDoc(sessionDoc);
-    
-    return docSnap.exists();
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const sessionDoc = doc(db, 'sessions', sessionId);
+      const docSnap = await getDoc(sessionDoc);
+      
+      const exists = docSnap.exists();
+      console.log('Firestore verification - session exists:', exists);
+      return exists;
+    } catch (verifyError) {
+      console.error('Error verifying session creation:', verifyError);
+      return false;
+    }
   } catch (error) {
     console.error('Error creating session:', error);
     return false;
@@ -106,7 +133,7 @@ export const createSession = async (sessionId: string): Promise<boolean> => {
  */
 export const updateSessionBasicInfo = async (
   sessionId: string, 
-  updates: Partial<{ id: string, createdAt: number, users: Record<string, User> }>
+  updates: Partial<{ id: string, createdAt: number, users: Record<string, User>, icebreakerType: IcebreakerType }>
 ): Promise<void> => {
   const sessionDoc = doc(db, 'sessions', sessionId);
   await updateDoc(sessionDoc, updates);

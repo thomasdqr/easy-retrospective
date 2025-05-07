@@ -1,4 +1,5 @@
 import { User } from '../../types';
+import { IcebreakerType } from '../../types/icebreaker';
 
 export interface Statement {
   text: string;
@@ -31,6 +32,7 @@ export interface IcebreakerProps {
   currentUser: User;
   users: Record<string, User>;
   onComplete: () => void;
+  icebreakerType: IcebreakerType;
 }
 
 // Interfaces for component props

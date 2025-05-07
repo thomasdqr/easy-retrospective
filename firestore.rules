@@ -8,13 +8,16 @@ service cloud.firestore {
       allow read: if true;
       
       // Allow creation of new sessions
-      allow create: if request.resource.data.keys().hasOnly(['id', 'createdAt', 'users']) &&
+      allow create: if request.resource.data.keys().hasOnly(['id', 'createdAt', 'users', 'icebreakerType']) &&
                      request.resource.data.id is string &&
                      request.resource.data.createdAt is number &&
-                     request.resource.data.users is map;
+                     request.resource.data.users is map &&
+                     request.resource.data.icebreakerType is string;
       
-      // Allow updates only to the users field
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users']) &&
+      // Allow updates to the users and icebreakerType fields
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users']) ||
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['icebreakerType']) ||
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users', 'icebreakerType'])) &&
                      request.resource.data.id == resource.data.id &&
                      request.resource.data.createdAt == resource.data.createdAt;
       

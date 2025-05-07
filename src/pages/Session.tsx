@@ -13,6 +13,7 @@ import { subscribeToSessionBasicInfo, addUserToSession } from '../services/fireb
 import { subscribeToSessionRevealed, toggleSessionReveal, subscribeToIcebreakerState, subscribeToVotingPhase, subscribeToStickyNotes } from '../services/realtimeDbService';
 import { USER_SESSION_KEY } from '../constants';
 import { StickyNote } from '../types';
+import { IcebreakerType, DEFAULT_ICEBREAKER } from '../types/icebreaker';
 
 // Key for storing retrospective started status in localStorage
 const RETROSPECTIVE_STARTED_KEY = 'retrospective_started_';
@@ -20,7 +21,7 @@ const RETROSPECTIVE_STARTED_KEY = 'retrospective_started_';
 function Session() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const [sessionBasicInfo, setSessionBasicInfo] = useState<{id: string, createdAt: number, users: Record<string, User>} | null>(null);
+  const [sessionBasicInfo, setSessionBasicInfo] = useState<{id: string, createdAt: number, users: Record<string, User>, icebreakerType?: IcebreakerType} | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
   const [isVotingPhase, setIsVotingPhase] = useState<boolean>(false);
@@ -139,7 +140,7 @@ function Session() {
     }
   }, [sessionBasicInfo, currentUser, navigate]);
 
-  const handleUserComplete = async (userData: Omit<User, 'id'>) => {
+  const handleUserComplete = async (userData: Omit<User, 'id'>, icebreakerType?: IcebreakerType) => {
     if (!sessionId || !sessionBasicInfo) return;
 
     const userId = nanoid();
@@ -159,6 +160,20 @@ function Session() {
     localStorage.setItem(USER_SESSION_KEY, JSON.stringify(sessionData));
     
     setCurrentUser(user);
+
+    // If the user is a creator and specified an icebreaker type, update the session
+    if (user.isCreator && icebreakerType) {
+      try {
+        // Since we can't directly update icebreakerType with security rules,
+        // we'll add a reference to it in the realtime database
+        const { set, ref } = await import('firebase/database');
+        const { realtimeDb } = await import('../config/firebase');
+        const icebreakerTypeRef = ref(realtimeDb, `sessions/${sessionId}/icebreakerType`);
+        await set(icebreakerTypeRef, icebreakerType);
+      } catch (error) {
+        console.error('Error updating icebreaker type:', error);
+      }
+    }
   };
 
   const handleToggleReveal = async () => {
@@ -221,6 +236,9 @@ function Session() {
   if (!icebreakerCompleted && sessionBasicInfo && sessionId) {
     // Check if the creator is the only person in the session
     const isCreatorAlone = currentUser?.isCreator && Object.keys(sessionBasicInfo.users || {}).length === 1;
+    
+    // Get the icebreaker type from session info or use the default
+    const icebreakerType = sessionBasicInfo.icebreakerType || DEFAULT_ICEBREAKER;
 
     return (
       <div className="min-h-screen bg-linear-to-br from-indigo-100 to-purple-100">
@@ -280,6 +298,7 @@ function Session() {
               currentUser={currentUser}
               users={sessionBasicInfo.users}
               onComplete={handleIcebreakerComplete}
+              icebreakerType={icebreakerType}
             />
 
             <div className="fixed bottom-4 right-4 z-50 w-80">

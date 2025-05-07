@@ -19,6 +19,11 @@
           ".write": true,
           ".validate": "newData.hasChildren(['timeLeft', 'isRunning']) && newData.child('timeLeft').isNumber() && newData.child('isRunning').isBoolean()"
         },
+        "icebreakerType": {
+          ".read": true,
+          ".write": true,
+          ".validate": "newData.isString()"
+        },
         "icebreaker": {
           ".read": true,
           ".write": true,
@@ -37,6 +42,9 @@
             ".validate": "newData.isBoolean() || newData.val() == null"
           },
           "finalLeaderboard": {
+            ".validate": "newData.isBoolean() || newData.val() == null"
+          },
+          "retrospectiveStarted": {
             ".validate": "newData.isBoolean() || newData.val() == null"
           }
         }
