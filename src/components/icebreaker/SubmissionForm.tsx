@@ -2,8 +2,8 @@ import React from 'react';
 import { SubmissionFormProps } from './types';
 
 const SubmissionForm: React.FC<SubmissionFormProps> = ({ 
-  statements, 
-  setStatements, 
+  statements = [], 
+  setStatements = () => {}, 
   onSubmit 
 }) => {
   return (
@@ -23,7 +23,10 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({
               setStatements(newStatements);
             }}
             placeholder={index === 2 ? "Enter your lie" : `Enter truth ${index + 1}`}
-            className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            className={`w-full p-3 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 
+              ${index === 2 
+                ? 'bg-red-50 border border-red-200 line-through' 
+                : 'bg-green-50 border border-green-200'}`}
           />
         </div>
       ))}
