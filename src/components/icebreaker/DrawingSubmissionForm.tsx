@@ -12,6 +12,12 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
   const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
   const [lastX, setLastX] = useState(0);
   const [lastY, setLastY] = useState(0);
+  const [brushSize, setBrushSize] = useState(2);
+  const [brushColor, setBrushColor] = useState('#000');
+  const [isEraser, setIsEraser] = useState(false);
+
+  // Colors for the palette
+  const colors = ['#000', '#f44336', '#2196f3', '#4caf50', '#ffeb3b', '#ff9800', '#9c27b0'];
 
   // Resize the canvas to match its container
   const resizeCanvas = () => {
@@ -66,6 +72,22 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
     };
   }, []);
 
+  // Update brush settings when they change
+  useEffect(() => {
+    if (!ctx) return;
+    
+    // Set stroke style based on whether eraser is active or not
+    if (isEraser) {
+      ctx.strokeStyle = '#fff';
+    } else {
+      ctx.strokeStyle = brushColor;
+    }
+    
+    ctx.lineWidth = brushSize;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+  }, [ctx, brushColor, brushSize, isEraser]);
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!ctx || !canvasRef.current) return;
 
@@ -117,6 +139,10 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
     });
   };
 
+  const toggleEraser = () => {
+    setIsEraser(!isEraser);
+  };
+
   const handleSubmit = () => {
     if (!drawing?.imageData) {
       alert('Please draw something first!');
@@ -133,7 +159,37 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
       <p className="mb-6 text-gray-700">Draw what you did during your weekend:</p>
       
-      <div className="mb-6">
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center space-x-2">
+            {colors.map(color => (
+              <button
+                key={color}
+                onClick={() => { setBrushColor(color); setIsEraser(false); }}
+                className={`w-8 h-8 rounded-full ${brushColor === color && !isEraser ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+                style={{ backgroundColor: color }}
+                aria-label={`Select ${color} color`}
+              />
+            ))}
+            <button
+              onClick={toggleEraser}
+              className={`ml-2 px-3 py-1 text-sm border border-gray-300 rounded ${isEraser ? 'bg-gray-200 font-bold' : 'bg-white'}`}
+            >
+              Eraser
+            </button>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-2 text-sm text-gray-600">Brush size:</span>
+            <input
+              type="range"
+              min="1"
+              max="20"
+              value={brushSize}
+              onChange={(e) => setBrushSize(parseInt(e.target.value))}
+              className="w-24"
+            />
+          </div>
+        </div>
         <div ref={containerRef} className="border border-gray-300 rounded-lg overflow-hidden">
           <canvas
             ref={canvasRef}
