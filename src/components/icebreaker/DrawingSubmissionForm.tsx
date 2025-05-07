@@ -7,23 +7,31 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
   onSubmit
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
   const [lastX, setLastX] = useState(0);
   const [lastY, setLastY] = useState(0);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
+  // Resize the canvas to match its container
+  const resizeCanvas = () => {
+    if (!canvasRef.current || !containerRef.current) return;
 
     const canvas = canvasRef.current;
+    const container = containerRef.current;
+    
+    // Get the container's width
+    const containerWidth = container.clientWidth;
+    
+    // Set canvas dimensions to match container
+    canvas.width = containerWidth;
+    canvas.height = 300;
+
+    // Re-initialize the context after resize
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    // Set canvas size
-    canvas.width = 500;
-    canvas.height = 300;
-
-    // Set initial styles
+    // Reset styles
     context.strokeStyle = '#000';
     context.lineJoin = 'round';
     context.lineCap = 'round';
@@ -34,6 +42,28 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     setCtx(context);
+  };
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    // Initialize canvas
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    setCtx(context);
+    
+    // Resize canvas initially
+    resizeCanvas();
+    
+    // Add resize event listener
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+    };
   }, []);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -104,14 +134,14 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
       <p className="mb-6 text-gray-700">Draw what you did during your weekend:</p>
       
       <div className="mb-6">
-        <div className="border border-gray-300 rounded-lg overflow-hidden">
+        <div ref={containerRef} className="border border-gray-300 rounded-lg overflow-hidden">
           <canvas
             ref={canvasRef}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseOut={stopDrawing}
-            className="cursor-crosshair"
+            className="cursor-crosshair w-full"
             style={{ touchAction: 'none' }}
           />
         </div>
