@@ -656,7 +656,7 @@ export const toggleVoteForStickyNote = async (
     
     // Count total votes by this user
     let userVoteCount = 0;
-    Object.values(allStickyNotes).forEach((note: StickyNote) => {
+    Object.values(allStickyNotes as Record<string, StickyNote>).forEach((note) => {
       if (note.votes && note.votes[userId]) {
         userVoteCount++;
       }

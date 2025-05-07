@@ -22,6 +22,7 @@ export interface PlayerState {
   votes?: { [voterId: string]: string | number };
   score: number;
   statementOrder?: number[];
+  revealed?: boolean;
 }
 
 export interface IcebreakerGameState {

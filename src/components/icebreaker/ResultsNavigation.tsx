@@ -28,7 +28,7 @@ const ResultsNavigation: React.FC<ResultsNavigationProps> = ({
         {gameState.activeUser && users[gameState.activeUser] 
           ? icebreakerType === 'two-truths-one-lie'
             ? `Showing ${gameState.revealed ? 'results' : 'votes'} for ${users[gameState.activeUser].name}`
-            : `Showing ${gameState.revealed ? 'results with correct guesses' : 'guesses'} for ${users[gameState.activeUser].name}`
+            : `Showing ${gameState.revealed ? 'results' : 'guesses'} for ${users[gameState.activeUser].name}`
           : 'Waiting for results...'}
       </span>
       

@@ -9,38 +9,26 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
   gameState,
   currentUser,
   users,
-  userGuesses = {}, // Default empty object to avoid undefined
   handleGuess,
   sessionId
 }) => {
   const [guessInput, setGuessInput] = useState('');
+  
   const state = gameState.users[userId];
   const user = users[userId];
-  if (!state || !user || !state.drawing) return null;
-
-  const myGuess = userGuesses[userId];
+  
+  // Get valid user IDs before any early returns
   const validUserIds = getValidUserIds(users);
-
+  
   // Get only users that exist in both the Firestore users list and the game state 
-  const activeUserIds = Object.keys(gameState.users).filter(id => validUserIds.includes(id));
-
-  // Check if we're in voting phase by checking if all valid users have voted
-  const isVoting = !activeUserIds.every(userId => {
-    const votesReceived = activeUserIds.filter(voterId => 
-      gameState.users[voterId]?.votes && 
-      gameState.users[voterId].votes[userId] !== undefined &&
-      voterId !== userId
-    ).length;
-    
-    const requiredVotes = activeUserIds.filter(id => id !== userId).length;
-    return votesReceived >= requiredVotes;
-  });
-
-  const hasGuessedForThisUser = myGuess !== undefined;
-  const isRevealed = gameState.revealed && gameState.activeUser === userId;
-
-  // Collect guesses from all users about this drawing
+  const activeUserIds = useMemo(() => {
+    return Object.keys(gameState.users).filter(id => validUserIds.includes(id));
+  }, [gameState.users, validUserIds]);
+  
+  // Collect guesses from all users about this drawing - moved before early return
   const allGuesses = useMemo(() => {
+    if (!state || !state.drawing) return {}; // Return empty object if no state
+    
     const guesses: Record<string, string> = {};
     
     // Loop through all active users
@@ -57,7 +45,34 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
     });
     
     return guesses;
-  }, [activeUserIds, gameState.users, userId]);
+  }, [activeUserIds, gameState.users, userId, state]);
+  
+  if (!state || !user || !state.drawing) return null;
+
+  // Check if we're in voting phase by checking if all valid users have voted
+  const isVoting = !activeUserIds.every(userId => {
+    const votesReceived = activeUserIds.filter(voterId => 
+      gameState.users[voterId]?.votes && 
+      gameState.users[voterId].votes[userId] !== undefined &&
+      voterId !== userId
+    ).length;
+    
+    const requiredVotes = activeUserIds.filter(id => id !== userId).length;
+    return votesReceived >= requiredVotes;
+  });
+
+  // Get the user's guess for this drawing (current user's vote for this drawing)
+  const currentUserVote = gameState.users[currentUser.id]?.votes?.[userId];
+  const myGuess = currentUserVote !== undefined 
+    ? (typeof currentUserVote === 'string' ? currentUserVote : String(currentUserVote))
+    : null;
+
+  // Check if current user has voted for this drawing
+  const hasCurrentUserVoted = gameState.users[currentUser.id]?.votes?.[userId] !== undefined;
+  const hasGuessedForThisUser = myGuess !== undefined && myGuess !== null && hasCurrentUserVoted;
+  
+  const isRevealed = gameState.revealed && gameState.activeUser === userId;
+  const isResultsPhase = !isVoting && gameState.activeUser !== null;
 
   // Get correct guessers when revealed
   const correctGuessers = !isVoting && isRevealed ? Object.entries(state.drawing.correctGuesses || {})
@@ -70,6 +85,7 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
       alert('Please enter your guess!');
       return;
     }
+    
     if (handleGuess) {
       handleGuess(userId, guessInput.trim());
     }
@@ -132,6 +148,7 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
         </div>
       </div>
 
+      {/* Input area for submitting guesses - only in voting phase */}
       {isVoting && userId !== currentUser.id && (
         <div className="mb-6">
           <div className="flex gap-2">
@@ -150,56 +167,100 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
               Submit Guess
             </button>
           </div>
+          
+          {/* Always show the user's guess if they've made one */}
           {hasGuessedForThisUser && (
-            <p className="mt-2 text-sm text-indigo-600">
-              Your guess: {myGuess}
-            </p>
+            <div className="mt-3 p-3 rounded-md border bg-indigo-50 border-indigo-300">
+              <div className="flex items-center">
+                <span className="text-gray-800">
+                  <span className="font-medium">Your guess:</span> {myGuess}
+                </span>
+              </div>
+            </div>
           )}
         </div>
       )}
 
-      {!isVoting && (
-        <div className="space-y-4">
-          {Object.entries(allGuesses).map(([voterId, guess]) => {
-            if (!activeUserIds.includes(voterId) || voterId === userId) return null;
-            const voter = users[voterId];
-            if (!voter) return null;
-
-            const isCorrect = isRevealed && state.drawing?.correctGuesses?.[voterId];
-            const guessClass = isRevealed
-              ? isCorrect
-                ? 'bg-green-50 border-green-300'
+      {/* Show current user's guess in results phase if not shown above */}
+      {!isVoting && hasGuessedForThisUser && userId !== currentUser.id && (
+        <div 
+          className={`mb-6 p-4 rounded-md border ${
+            isRevealed 
+              ? state.drawing?.correctGuesses?.[currentUser.id] 
+                ? 'bg-green-50 border-green-300' 
                 : 'bg-red-50 border-red-300'
-              : 'bg-gray-50 border-gray-300';
-
-            const isCreatorAndRevealed = currentUser.isCreator && isRevealed;
-
-            return (
-              <div
-                key={voterId}
-                className={`p-4 rounded-md border ${guessClass} ${isCreatorAndRevealed ? 'cursor-pointer' : ''}`}
-                onClick={isCreatorAndRevealed ? () => toggleCorrectGuess(voterId) : undefined}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-800">
-                    <span className="font-medium">{voter.name}:</span> {guess}
-                  </span>
-                  {isRevealed && (
-                    <span className={`${isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs font-semibold px-2.5 py-0.5 rounded`}>
-                      {isCorrect ? 'CORRECT' : 'INCORRECT'}
-                    </span>
-                  )}
-                </div>
-                {isCreatorAndRevealed && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    {isCorrect ? 'Click to mark as incorrect' : 'Click to mark as correct'}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              : 'bg-indigo-50 border-indigo-300'
+          } ${currentUser.isCreator && isRevealed ? 'cursor-pointer' : ''}`}
+          onClick={currentUser.isCreator && isRevealed ? () => toggleCorrectGuess(currentUser.id) : undefined}
+        >
+          <div className="flex justify-between items-center">
+            <span className="text-gray-800">
+              <span className="font-medium">Your guess:</span> {myGuess}
+            </span>
+            {isRevealed && (
+              <span className={`${state.drawing?.correctGuesses?.[currentUser.id] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs font-semibold px-2.5 py-0.5 rounded`}>
+                {state.drawing?.correctGuesses?.[currentUser.id] ? 'CORRECT' : 'INCORRECT'}
+              </span>
+            )}
+          </div>
+          {currentUser.isCreator && isRevealed && (
+            <div className="mt-2 text-xs text-gray-500">
+              {state.drawing?.correctGuesses?.[currentUser.id] 
+                ? 'Click to mark as incorrect' 
+                : 'Click to mark as correct'}
+            </div>
+          )}
         </div>
       )}
+
+      {/* Show all users' guesses ONLY during results phase (not during voting phase) */}
+      {(!isVoting || // Show to everyone in results phase
+        (currentUser.isCreator && gameState.activeUser === userId && !isVoting)) && // Or to creator only during reveal phase, not during voting
+        (
+          <div className="space-y-4">
+            {Object.entries(allGuesses).map(([voterId, guess]) => {
+              if (!activeUserIds.includes(voterId) || voterId === userId) return null;
+              const voter = users[voterId];
+              if (!voter) return null;
+              
+              // Don't duplicate the current user's guess
+              if (voterId === currentUser.id && isResultsPhase) return null;
+
+              const isCorrect = isRevealed && state.drawing?.correctGuesses?.[voterId];
+              const guessClass = isRevealed
+                ? isCorrect
+                  ? 'bg-green-50 border-green-300'
+                  : 'bg-red-50 border-red-300'
+                : 'bg-gray-50 border-gray-300';
+
+              const isCreatorAndRevealed = currentUser.isCreator && isRevealed;
+
+              return (
+                <div
+                  key={voterId}
+                  className={`p-4 rounded-md border ${guessClass} ${isCreatorAndRevealed ? 'cursor-pointer' : ''}`}
+                  onClick={isCreatorAndRevealed ? () => toggleCorrectGuess(voterId) : undefined}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-800">
+                      <span className="font-medium">{voter.name}:</span> {guess}
+                    </span>
+                    {isRevealed && (
+                      <span className={`${isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} text-xs font-semibold px-2.5 py-0.5 rounded`}>
+                        {isCorrect ? 'CORRECT' : 'INCORRECT'}
+                      </span>
+                    )}
+                  </div>
+                  {isCreatorAndRevealed && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      {isCorrect ? 'Click to mark as incorrect' : 'Click to mark as correct'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
       {isRevealed && (
         <div className="mt-6 p-4 bg-indigo-50 rounded-md">

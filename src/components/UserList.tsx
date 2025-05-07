@@ -55,10 +55,11 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
           // Check for either statements (TwoTruthsOneLie) or drawing (DrawYourWeekend)
           let hasSubmitted = false;
           
-          if (userState.metadata?.type === 'drawing') {
-            // For DrawYourWeekend, check the metadata
-            const drawingData = userState.metadata.data;
-            hasSubmitted = drawingData && drawingData.imageData !== '' && drawingData.description.trim() !== '';
+          if (userState.drawing) {
+            // For DrawYourWeekend, check drawing data
+            hasSubmitted = userState.drawing && 
+                          userState.drawing.imageData !== '' && 
+                          userState.drawing.description.trim() !== '';
           } else if (userState.statements) {
             // For TwoTruthsOneLie, check statements
             hasSubmitted = Object.values(userState.statements).every(
@@ -72,13 +73,17 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
 
         // Check if all votes are complete
         const allVotesComplete = validUserIds.every(userId => {
-          const votesReceived = validUserIds.filter(voterId => {
-            if (voterId === userId) return false;
-            const voterState = extendedState.users[voterId];
-            return voterState?.votes && voterState.votes[userId] !== undefined;
+          // Count how many votes this user has cast (not received)
+          const votesCast = validUserIds.filter(targetId => {
+            // Skip self
+            if (targetId === userId) return false;
+            
+            const targetUserState = extendedState.users[targetId];
+            return targetUserState?.votes && targetUserState.votes[userId] !== undefined;
           }).length;
           
-          return votesReceived >= validUserIds.length - 1;
+          // User has completed voting if they've cast votes for all other users
+          return votesCast >= validUserIds.length - 1;
         });
         
         const isVotingPhase = allSubmitted && !allVotesComplete;
@@ -103,20 +108,25 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
 
   // Function to get voting progress for a user during the icebreaker voting phase
   const getVotingProgress = (userId: string) => {
-    
     if (!gameState || !gameState.users || !isIcebreakerVotingPhase) {
-
       return null;
     }
     
     const actualValidUserIds = getValidUserIds(users);
-    const activeUserIds = actualValidUserIds.filter(id => id !== userId);
-    const totalPossibleVotes = activeUserIds.length;
+    // Total users except self
+    const totalPossibleVotes = actualValidUserIds.length - 1;
     
+    // Need to count votes cast BY this user, not votes received
+    // A user's votes are stored in OTHER users' vote objects
     let votesCast = 0;
-    activeUserIds.forEach(targetUserId => {
+    
+    // Loop through all users to find votes cast by this user
+    actualValidUserIds.forEach(targetUserId => {
+      // Skip self
+      if (targetUserId === userId) return;
+      
       const targetUserState = gameState.users[targetUserId];
-      if (targetUserState?.votes && targetUserState.votes[userId] !== undefined) {
+      if (targetUserState && targetUserState.votes && targetUserState.votes[userId] !== undefined) {
         votesCast++;
       }
     });

@@ -16,6 +16,11 @@ import { realtimeDb } from '../../../config/firebase';
 import UserDrawings from '../UserDrawings';
 import DrawingSubmissionForm from '../DrawingSubmissionForm';
 
+// Extended type for DrawYourWeekend that includes the drawing property
+interface DrawingPlayerState extends IcebreakerPlayerState {
+  drawing?: Drawing;
+}
+
 // Helper function to convert game state to database state
 const convertToDbState = (state: IcebreakerGameState): IcebreakerState => {
   const dbUsers: Record<string, IcebreakerPlayerState> = {};
@@ -29,7 +34,8 @@ const convertToDbState = (state: IcebreakerGameState): IcebreakerState => {
         "2": { text: "", isLie: false, revealed: false }
       },
       votes: {},
-      score: user.score || 0
+      score: user.score || 0,
+      revealed: user.revealed || false
     };
 
     // Preserve all votes as-is for draw-your-weekend
@@ -39,7 +45,7 @@ const convertToDbState = (state: IcebreakerGameState): IcebreakerState => {
 
     // Add drawing data if it exists
     if (user.drawing) {
-      (baseState as IcebreakerPlayerState & { drawing: Drawing }).drawing = user.drawing;
+      (baseState as DrawingPlayerState).drawing = user.drawing;
     }
 
     dbUsers[userId] = baseState;
@@ -62,11 +68,12 @@ const convertFromDbState = (dbState: IcebreakerState): IcebreakerGameState => {
   Object.entries(dbState.users).forEach(([userId, user]) => {
     const playerState: PlayerState = {
       score: user.score || 0,
-      votes: user.votes || {}
+      votes: user.votes || {},
+      revealed: user.revealed || false
     };
 
     // Get drawing data if it exists
-    const extendedUser = user as unknown as IcebreakerPlayerState;
+    const extendedUser = user as DrawingPlayerState;
     if (extendedUser.drawing) {
       playerState.drawing = extendedUser.drawing;
     }
@@ -108,10 +115,14 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
   const handleSetActiveUser = useCallback(async (userId: string) => {
     if (!currentUser.isCreator) return;
 
+    // Keep track of whether this user's results have already been revealed
+    const userWasRevealed = gameState.users[userId]?.revealed || false;
+
     const newState = {
       ...gameState,
       activeUser: userId,
-      revealed: false,
+      // Preserve revealed status if this user was previously revealed
+      revealed: userWasRevealed,
       finalLeaderboard: false
     };
 
@@ -137,17 +148,19 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
         });
         setGameState(gameStateUpdate);
 
-        // Update local guess tracking
+        // Update local guess tracking - Only track guesses the current user has actually made
         if (state.users && state.users[currentUser.id]?.votes) {
           const myGuesses: Record<string, string> = {};
 
-          Object.entries(state.users).forEach(([userId, userState]) => {
-            if (userState.votes && userState.votes[currentUser.id] !== undefined) {
-              myGuesses[userId] = String(userState.votes[currentUser.id]);
+          // Only extract votes that the current user has actually made
+          const currentUserVotes = state.users[currentUser.id]?.votes || {};
+          Object.entries(currentUserVotes).forEach(([targetUserId, guess]) => {
+            if (guess !== undefined) {
+              myGuesses[targetUserId] = typeof guess === 'string' ? guess : String(guess);
             }
           });
 
-          console.log("Updated user guesses:", myGuesses);
+          console.log("Updated user guesses (from current user votes):", myGuesses);
           setUserGuesses(myGuesses);
         }
       }
@@ -257,6 +270,37 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     }
   }, [allSubmitted, allVoted, gameState.finalLeaderboard, gameState.activeUser, currentUser.isCreator, users, handleSetActiveUser]);
 
+  // Add additional effect to monitor voting status and transition when all votes are in
+  useEffect(() => {
+    // Only proceed if all required conditions are met
+    if (
+      currentUser.isCreator && // Only the creator should trigger this
+      allSubmitted &&          // All users have submitted drawings
+      allVoted &&              // All users have voted
+      !gameState.finalLeaderboard && // Not already in leaderboard view
+      !gameState.revealed      // Not already in reveal state
+    ) {
+      console.log("All users have voted! Transitioning to results phase...");
+      
+      // Set the first user as active if no active user
+      if (!gameState.activeUser) {
+        const validUserIds = getValidUserIds(users);
+        if (validUserIds.length > 0) {
+          handleSetActiveUser(validUserIds[0]);
+        }
+      }
+    }
+  }, [
+    allSubmitted, 
+    allVoted, 
+    currentUser.isCreator, 
+    gameState.activeUser, 
+    gameState.finalLeaderboard, 
+    gameState.revealed, 
+    handleSetActiveUser, 
+    users
+  ]);
+
   const handleSubmit = async () => {
     if (!drawing.imageData || !drawing.description.trim()) {
       alert('Please draw something and provide a description');
@@ -348,10 +392,11 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
       currentUserVotes: gameState.users[currentUser.id]?.votes
     });
 
-    setUserGuesses({
-      ...userGuesses,
+    // Only update userGuesses for the specific drawing being guessed
+    setUserGuesses(prev => ({
+      ...prev,
       [userId]: guess
-    });
+    }));
 
     const updatedUserState = {
       ...gameState.users[currentUser.id],
@@ -427,13 +472,17 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     const validUserIds = getValidUserIds(users);
     const currentIndex = validUserIds.indexOf(gameState.activeUser);
 
-    if (currentIndex === validUserIds.length - 1 && gameState.revealed) {
-      console.log("Last user reached and revealed, showing leaderboard");
+    // Calculate the next index, wrapping around if needed
+    const nextIndex = (currentIndex + 1) % validUserIds.length;
+
+    // If we're at the last user and already revealed, and we're about to loop back to the first user
+    if (currentIndex === validUserIds.length - 1 && gameState.revealed && nextIndex === 0) {
+      console.log("All users have been viewed, showing leaderboard");
       handleShowLeaderboard();
       return;
     }
 
-    const nextIndex = (currentIndex + 1) % validUserIds.length;
+    // Otherwise, just move to the next user
     handleSetActiveUser(validUserIds[nextIndex]);
   }, [gameState.activeUser, gameState.revealed, currentUser.isCreator, users, handleSetActiveUser, handleShowLeaderboard]);
 
@@ -464,6 +513,12 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     const updatedUsers = { ...gameState.users };
     const validUserIds = getValidUserIds(users);
 
+    // Mark that this user has been revealed
+    updatedUsers[gameState.activeUser] = {
+      ...activeUserState,
+      revealed: true
+    };
+
     validUserIds.forEach(voterId => {
       if (voterId === gameState.activeUser) return; // Skip the drawing owner
 
@@ -471,7 +526,10 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
       if (!userState) return;
 
       // Get the guess this user made for the active user's drawing
-      const userGuess = gameState.users[voterId]?.votes?.[gameState.activeUser];
+      const activeUserIdSafe = gameState.activeUser || '';
+      if (!activeUserIdSafe) return; // Skip if no active user
+      
+      const userGuess = gameState.users[voterId]?.votes?.[activeUserIdSafe];
       if (userGuess) {
         const guessText = typeof userGuess === 'string' ? userGuess : String(userGuess);
         
@@ -484,11 +542,12 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
           };
 
           // Mark the guess as correct
-          if (updatedUsers[gameState.activeUser]) {
-            updatedUsers[gameState.activeUser].drawing = {
-              ...updatedUsers[gameState.activeUser].drawing!,
+          const activeUser = gameState.activeUser || '';
+          if (activeUser && updatedUsers[activeUser]) {
+            updatedUsers[activeUser].drawing = {
+              ...updatedUsers[activeUser].drawing!,
               correctGuesses: {
-                ...updatedUsers[gameState.activeUser].drawing!.correctGuesses,
+                ...updatedUsers[activeUser].drawing!.correctGuesses,
                 [voterId]: true
               }
             };
@@ -591,12 +650,12 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
                       <div
                         className="h-2 bg-indigo-600 rounded-full transition-all duration-300 ease-in-out"
                         style={{
-                          width: `${(Object.keys(userGuesses).length / (getValidUserIds(users).length - 1)) * 100}%`
+                          width: `${(Object.keys(gameState.users[currentUser.id]?.votes || {}).length / (getValidUserIds(users).length - 1)) * 100}%`
                         }}
                       ></div>
                     </div>
                     <div className="ml-4 text-sm font-medium text-gray-700">
-                      {Object.keys(userGuesses).length}/{getValidUserIds(users).length - 1} guessed
+                      {Object.keys(gameState.users[currentUser.id]?.votes || {}).length}/{getValidUserIds(users).length - 1} guessed
                     </div>
                   </div>
 

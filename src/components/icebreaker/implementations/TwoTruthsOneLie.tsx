@@ -40,7 +40,8 @@ const convertToDbState = (state: IcebreakerGameState): IcebreakerState => {
         statements,
         votes: typedVotes,
         score: user.score || 0,
-        statementOrder: user.statementOrder || [0, 1, 2]
+        statementOrder: user.statementOrder || [0, 1, 2],
+        revealed: user.revealed || false
       };
     }
   });
@@ -84,10 +85,14 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
   const handleSetActiveUser = useCallback(async (userId: string) => {
     if (!currentUser.isCreator) return;
     
+    // Keep track of whether this user's results have already been revealed
+    const userWasRevealed = gameState.users[userId]?.revealed || false;
+    
     const newState = {
       ...gameState,
       activeUser: userId,
-      revealed: false,
+      // Preserve revealed status if this user was previously revealed
+      revealed: userWasRevealed,
       finalLeaderboard: false
     };
     
@@ -124,7 +129,7 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
           
           Object.entries(state.users).forEach(([userId, userState]) => {
             if (userState.votes && userState.votes[currentUser.id] !== undefined) {
-              myVotes[userId] = userState.votes[currentUser.id];
+              myVotes[userId] = Number(userState.votes[currentUser.id]);
             }
           });
           
@@ -407,14 +412,17 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     const validUserIds = getValidUserIds(users);
     const currentIndex = validUserIds.indexOf(gameState.activeUser);
     
-    // If we're at the last user and already revealed
-    if (currentIndex === validUserIds.length - 1 && gameState.revealed) {
-      console.log("Last user reached and revealed, showing leaderboard");
+    // Calculate the next index, wrapping around if needed
+    const nextIndex = (currentIndex + 1) % validUserIds.length;
+    
+    // If we're at the last user and already revealed, and we're about to loop back to the first user
+    if (currentIndex === validUserIds.length - 1 && gameState.revealed && nextIndex === 0) {
+      console.log("All users have been viewed, showing leaderboard");
       handleShowLeaderboard();
       return;
     }
     
-    const nextIndex = (currentIndex + 1) % validUserIds.length;
+    // Otherwise, just move to the next user
     handleSetActiveUser(validUserIds[nextIndex]);
   }, [gameState.activeUser, gameState.revealed, currentUser.isCreator, users, handleSetActiveUser, handleShowLeaderboard]);
   
@@ -453,6 +461,12 @@ const TwoTruthsOneLie: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
     
     const updatedUsers = { ...gameState.users };
     const validUserIds = getValidUserIds(users);
+    
+    // Mark that this user has been revealed
+    updatedUsers[gameState.activeUser] = {
+      ...activeUserState,
+      revealed: true
+    };
     
     validUserIds.forEach(userId => {
       if (userId === gameState.activeUser) return;

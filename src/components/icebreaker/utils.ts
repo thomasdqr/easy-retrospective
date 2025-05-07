@@ -85,33 +85,51 @@ export const checkAllSubmitted = (gameState: IcebreakerGameState, users: Record<
 export const checkAllVoted = (gameState: IcebreakerGameState, users: Record<string, User>): boolean => {
   const validUserIds = getValidUserIds(users);
   
-  const votingStatus = validUserIds.map(userId => {
-    // Count how many votes this user has given (instead of received)
-    const votesGiven = Object.keys(gameState.users[userId]?.votes || {}).length;
-    const requiredVotes = validUserIds.length - 1; // excluding self-vote
-    
-    return {
-      userId,
-      votesGiven,
-      requiredVotes,
-      hasEnoughVotes: votesGiven >= requiredVotes
-    };
-  });
-
-  console.log("Debug - checkAllVoted:", {
-    validUserIds,
-    votingStatus,
-    gameStateVotes: Object.entries(gameState.users).map(([userId, user]) => ({
-      userId,
-      votes: user.votes,
-      votesGiven: Object.keys(user.votes || {}).length,
-      requiredVotes: validUserIds.length - 1
-    }))
-  });
+  // If there are no valid users or no game state, return false
+  if (validUserIds.length === 0 || Object.keys(gameState.users || {}).length === 0) {
+    console.log("Debug - checkAllVoted: No valid users or game state");
+    return false;
+  }
   
-  const result = votingStatus.every(status => status.hasEnoughVotes);
-  console.log("Debug - checkAllVoted result:", result);
-  return result;
+  // First, make sure all users have submitted
+  const allSubmitted = checkAllSubmitted(gameState, users);
+  if (!allSubmitted) {
+    console.log("Debug - checkAllVoted: Not all users have submitted yet");
+    return false;
+  }
+  
+  // Check votes for each user
+  let allVoted = true;
+  
+  // For each user, check if they've received votes from all other users
+  for (const targetUserId of validUserIds) {
+    // How many votes this user should receive (from all other users)
+    const requiredVotes = validUserIds.length - 1; // excluding self
+    
+    // Count how many other users have voted for this user
+    let votesReceived = 0;
+    
+    for (const voterId of validUserIds) {
+      // Skip self (users don't vote for themselves)
+      if (voterId === targetUserId) continue;
+      
+      const voterState = gameState.users[voterId];
+      // Check if this voter has voted for the target user
+      if (voterState?.votes && voterState.votes[targetUserId] !== undefined) {
+        votesReceived++;
+      }
+    }
+    
+    // If this user hasn't received enough votes, not everyone has voted
+    if (votesReceived < requiredVotes) {
+      allVoted = false;
+      console.log(`Debug - checkAllVoted: User ${targetUserId} has only received ${votesReceived}/${requiredVotes} votes`);
+      break;
+    }
+  }
+  
+  console.log("Debug - checkAllVoted result:", allVoted);
+  return allVoted;
 };
 
 /**
