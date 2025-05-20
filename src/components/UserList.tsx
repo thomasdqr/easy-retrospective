@@ -117,18 +117,8 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
     // Total users except self
     const totalPossibleVotes = actualValidUserIds.length - 1;
     
-    // Count votes made BY this user across all other users' vote records
-    const votesCast = actualValidUserIds.reduce((count, targetUserId) => {
-      // Skip counting votes for self
-      if (targetUserId === userId) return count;
-      
-      // Check if this user has voted for the target user
-      const targetUserState = gameState.users[targetUserId];
-      if (targetUserState?.votes && targetUserState.votes[userId] !== undefined) {
-        return count + 1;
-      }
-      return count;
-    }, 0);
+    // Count votes made BY this user
+    const votesCast = Object.keys(gameState.users[userId]?.votes || {}).length;
     
     return { votesCast, totalPossibleVotes };
   };
