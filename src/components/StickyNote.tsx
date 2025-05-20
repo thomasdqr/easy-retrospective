@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { StickyNote, User } from '../types';
 import { Trash2, ThumbsUp } from 'lucide-react';
 import {
@@ -41,7 +41,7 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author,
   const [content, setContent] = useState(note.content);
   const [notesMoving, setNotesMoving] = useState<Record<string, string | null>>({});
   const [notesPositions, setNotesPositions] = useState<Record<string, {x: number, y: number}>>({});
-  const [notesEditing, setNotesEditing] = useState<Record<string, string | null>>({});
+  const [notesEditing, setNotesEditing] = useState<Record<string, { userId: string; timestamp: number } | null>>({});
   const noteRef = useRef<HTMLDivElement>(null);
   const contentUpdaterRef = useRef<ReturnType<typeof createNoteContentUpdater>>();
   const positionUpdaterRef = useRef<ReturnType<typeof createNotePositionUpdater>>();
@@ -49,10 +49,25 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author,
   const justReleasedRef = useRef(false);
   const justReleasedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const maskedContentRef = useRef<string>('');
+  const editingHeartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  const lastEditingUpdateRef = useRef<number>(0);
 
   const isAuthor = currentUser.id === note.authorId;
   const isBeingMovedBySomeoneElse = notesMoving[note.id] && notesMoving[note.id] !== currentUser.id;
-  const isBeingEditedBySomeoneElse = notesEditing[note.id] && notesEditing[note.id] !== currentUser.id;
+  
+  // Update the editing state check to include timestamp validation
+  const isBeingEditedBySomeoneElse = useMemo(() => {
+    const editingState = notesEditing[note.id];
+    if (!editingState || !editingState.userId || editingState.userId === currentUser.id) {
+      return false;
+    }
+    
+    // Consider editing state stale if it's older than 1 minute
+    const now = Date.now();
+    const isStale = now - editingState.timestamp > 60000;
+    return !isStale;
+  }, [notesEditing, note.id, currentUser.id]);
+
   const canMove = !isBeingMovedBySomeoneElse && !isEditing && !isBeingEditedBySomeoneElse && !isVotingPhase;
   const canEdit = isAuthor && !isBeingMovedBySomeoneElse && !isBeingEditedBySomeoneElse && !isVotingPhase;
   const shouldShowContent = isRevealed || isAuthor;
@@ -94,14 +109,65 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author,
     return unsubscribe;
   }, [sessionId]);
 
-  // Subscribe to real-time notes editing status
+  // Subscribe to real-time notes editing status with improved handling
   useEffect(() => {
     const unsubscribe = subscribeToNotesEditing(sessionId, (notesEditingData) => {
-      setNotesEditing(notesEditingData);
+      // Convert server data to our expected format
+      const processedData: Record<string, { userId: string; timestamp: number } | null> = {};
+      
+      Object.entries(notesEditingData).forEach(([noteId, data]) => {
+        if (!data) {
+          processedData[noteId] = null;
+        } else if (typeof data === 'object' && 'userId' in data && 'timestamp' in data) {
+          processedData[noteId] = {
+            userId: data.userId,
+            timestamp: data.timestamp
+          };
+        }
+      });
+      
+      setNotesEditing(processedData);
+      
+      // Handle our own editing state
+      const currentEditingState = processedData[note.id];
+      if (isEditing) {
+        // If we're editing but someone else has taken over, or our state was cleared
+        if (currentEditingState?.userId !== currentUser.id) {
+          setIsEditing(false);
+          if (editingHeartbeatRef.current) {
+            clearInterval(editingHeartbeatRef.current);
+            editingHeartbeatRef.current = null;
+          }
+        }
+      }
     });
     
-    return unsubscribe;
-  }, [sessionId]);
+    return () => {
+      unsubscribe();
+      // Clear editing state and heartbeat when component unmounts
+      if (isEditing) {
+        setNoteEditingStatus(sessionId, note.id, null).catch(console.error);
+        if (editingHeartbeatRef.current) {
+          clearInterval(editingHeartbeatRef.current);
+          editingHeartbeatRef.current = null;
+        }
+      }
+    };
+  }, [sessionId, note.id, isEditing, currentUser.id]);
+
+  // Add automatic cleanup of stale editing states
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      Object.entries(notesEditing).forEach(([noteId, state]) => {
+        if (state && (now - state.timestamp > 60000)) {
+          setNoteEditingStatus(sessionId, noteId, null).catch(console.error);
+        }
+      });
+    }, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(cleanupInterval);
+  }, [sessionId, notesEditing]);
 
   // Update position from real-time updates if the note is being moved by someone else
   useEffect(() => {
@@ -229,13 +295,50 @@ function StickyNoteComponent({ note, sessionId, currentUser, isRevealed, author,
 
   const handleContentBlur = async () => {
     setIsEditing(false);
-    await setNoteEditingStatus(sessionId, note.id, null);
+    try {
+      await setNoteEditingStatus(sessionId, note.id, null);
+    } catch (error) {
+      console.error('Failed to clear editing status:', error);
+    }
+    
+    if (editingHeartbeatRef.current) {
+      clearInterval(editingHeartbeatRef.current);
+      editingHeartbeatRef.current = null;
+    }
   };
 
   const handleEditStart = async () => {
     if (canEdit) {
       setIsEditing(true);
-      await setNoteEditingStatus(sessionId, note.id, currentUser.id);
+      const now = Date.now();
+      lastEditingUpdateRef.current = now;
+      
+      try {
+        await setNoteEditingStatus(sessionId, note.id, currentUser.id);
+        
+        // Start heartbeat to keep editing state active
+        if (editingHeartbeatRef.current) {
+          clearInterval(editingHeartbeatRef.current);
+        }
+        
+        editingHeartbeatRef.current = setInterval(async () => {
+          if (isEditing) {
+            const currentTime = Date.now();
+            // Only update if we haven't updated in the last 15 seconds
+            if (currentTime - lastEditingUpdateRef.current >= 15000) {
+              try {
+                await setNoteEditingStatus(sessionId, note.id, currentUser.id);
+                lastEditingUpdateRef.current = currentTime;
+              } catch (error) {
+                console.error('Failed to update editing heartbeat:', error);
+              }
+            }
+          }
+        }, 15000); // Check every 15 seconds
+      } catch (error) {
+        console.error('Failed to start editing:', error);
+        setIsEditing(false);
+      }
     }
   };
 

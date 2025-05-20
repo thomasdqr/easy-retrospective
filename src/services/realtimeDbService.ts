@@ -1,4 +1,4 @@
-import { ref, set, onValue, off, DatabaseReference, get, DataSnapshot } from 'firebase/database';
+import { ref, set, onValue, off, DatabaseReference, get, DataSnapshot, serverTimestamp, onDisconnect, update } from 'firebase/database';
 import { realtimeDb } from '../config/firebase';
 import { StickyNote } from '../types';
 
@@ -519,43 +519,35 @@ export const deleteColumn = async (
 
 /**
  * Subscribe to notes editing status
- * This tracks which notes are being edited in real-time
  */
 export const subscribeToNotesEditing = (
   sessionId: string,
-  onNotesEditingUpdate: (notesEditing: Record<string, string | null>) => void
-) => {
-  const path = `notesEditing/${sessionId}`;
-  const notesEditingRef = ref(realtimeDb, path);
+  callback: (notesEditing: Record<string, { userId: string; timestamp: number } | null>) => void
+): (() => void) => {
+  const notesEditingRef = ref(realtimeDb, `notesEditing/${sessionId}`);
   
-  // Re-use existing subscription if available
-  if (activeRtSubscriptions[path]) {
-    console.log('Using existing notes editing subscription');
-    const existingRef = activeRtSubscriptions[path];
-    onValue(existingRef, (snapshot) => {
-      const data = snapshot.val() || {};
-      onNotesEditingUpdate(data);
+  const unsubscribe = onValue(notesEditingRef, (snapshot) => {
+    const data = snapshot.val() || {};
+    
+    // Process the data to convert server timestamp to client timestamp
+    const processedData: Record<string, { userId: string; timestamp: number } | null> = {};
+    
+    Object.entries(data).forEach(([noteId, value]: [string, any]) => {
+      if (!value) {
+        processedData[noteId] = null;
+      } else if (value.userId) {
+        processedData[noteId] = {
+          userId: value.userId,
+          // If the timestamp hasn't been set by the server yet, use current time
+          timestamp: value.timestamp || Date.now()
+        };
+      }
     });
     
-    return () => {
-      off(existingRef);
-      delete activeRtSubscriptions[path];
-    };
-  }
-  
-  // Create new subscription
-  console.log(`Creating new subscription for notes editing in session ${sessionId}`);
-  activeRtSubscriptions[path] = notesEditingRef;
-  
-  onValue(notesEditingRef, (snapshot) => {
-    const data = snapshot.val() || {};
-    onNotesEditingUpdate(data);
+    callback(processedData);
   });
   
-  return () => {
-    off(notesEditingRef);
-    delete activeRtSubscriptions[path];
-  };
+  return unsubscribe;
 };
 
 /**
@@ -567,7 +559,78 @@ export const setNoteEditingStatus = async (
   userId: string | null
 ): Promise<void> => {
   const noteEditingRef = ref(realtimeDb, `notesEditing/${sessionId}/${noteId}`);
-  await set(noteEditingRef, userId);
+  
+  if (userId) {
+    // When setting editing status, include a timestamp
+    await set(noteEditingRef, {
+      userId,
+      timestamp: serverTimestamp()
+    });
+  } else {
+    // When clearing editing status, remove the entire node
+    await set(noteEditingRef, null);
+  }
+};
+
+/**
+ * Clear stale editing states
+ * This will remove any editing states that are older than the specified timeout
+ */
+export const clearStaleEditingStates = async (sessionId: string, timeoutMinutes: number = 5): Promise<void> => {
+  const notesEditingRef = ref(realtimeDb, `notesEditing/${sessionId}`);
+  const snapshot = await get(notesEditingRef);
+  const data = snapshot.val() || {};
+  
+  const now = Date.now();
+  const staleTimeout = timeoutMinutes * 60 * 1000; // Convert minutes to milliseconds
+  
+  // Find and remove stale editing states
+  const updates: Record<string, null> = {};
+  Object.entries(data).forEach(([noteId, value]: [string, any]) => {
+    if (value && value.timestamp && (now - value.timestamp > staleTimeout)) {
+      updates[noteId] = null;
+    }
+  });
+  
+  // If we found any stale states, remove them
+  if (Object.keys(updates).length > 0) {
+    await update(notesEditingRef, updates);
+  }
+};
+
+/**
+ * Setup periodic cleanup of editing states for a user
+ */
+export const setupEditingStateCleanup = (sessionId: string, userId: string): void => {
+  const userCleanupRef = ref(realtimeDb, `users/${sessionId}/${userId}/cleanup`);
+  
+  // Set cleanup timestamp
+  onDisconnect(userCleanupRef).set(serverTimestamp());
+  
+  // When cleanup timestamp is set (user disconnected), clear their editing states
+  onValue(userCleanupRef, async (snapshot) => {
+    const cleanupTime = snapshot.val();
+    if (cleanupTime) {
+      const notesEditingRef = ref(realtimeDb, `notesEditing/${sessionId}`);
+      const editingSnapshot = await get(notesEditingRef);
+      const editingData = editingSnapshot.val() || {};
+      
+      // Find and clear any editing states owned by this user
+      const updates: Record<string, null> = {};
+      Object.entries(editingData).forEach(([noteId, value]: [string, any]) => {
+        if (value && value.userId === userId) {
+          updates[noteId] = null;
+        }
+      });
+      
+      if (Object.keys(updates).length > 0) {
+        await update(notesEditingRef, updates);
+      }
+      
+      // Clear the cleanup timestamp
+      await set(userCleanupRef, null);
+    }
+  });
 };
 
 // Icebreaker state functions

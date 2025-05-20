@@ -115,7 +115,22 @@
         ".write": true,
         "$noteId": {
           ".write": true,
-          ".validate": "newData.isString() || newData.val() == null"
+          ".validate": "(newData.hasChildren(['userId', 'timestamp']) && newData.child('userId').isString() && (newData.child('timestamp').isNumber() || newData.child('timestamp').val() === null)) || newData.val() == null"
+        }
+      }
+    },
+    "users": {
+      ".read": true,
+      ".write": true,
+      "$sessionId": {
+        ".read": true,
+        ".write": true,
+        "$userId": {
+          ".read": true,
+          ".write": true,
+          "cleanup": {
+            ".write": true
+          }
         }
       }
     },

@@ -26,7 +26,9 @@ import {
   deleteDrawingPath,
   subscribeToIcebreakerState,
   deleteStickyNote,
-  subscribeToVoteLimit
+  subscribeToVoteLimit,
+  setupEditingStateCleanup,
+  clearStaleEditingStates
 } from '../services/realtimeDbService';
 import { IcebreakerGameState } from './icebreaker/types';
 
@@ -63,7 +65,7 @@ const DEFAULT_RETROSPECTIVE_COLUMNS: Column[] = [
   },
   {
     id: 'needs-improvement',
-    title: '❌ What Needs Improvement',
+    title: '❌ What Went Wrong',
     color: 'bg-red-200',
     position: { x: COLUMN_WIDTH, width: COLUMN_WIDTH }
   },
@@ -992,6 +994,24 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggle
     // when the user clicks "Finish Tutorial" after completing all steps
     // If they click "Skip Tutorial" the state won't be saved to localStorage
   };
+
+  // Initialize editing state cleanup
+  useEffect(() => {
+    // Setup cleanup for the current user
+    setupEditingStateCleanup(sessionId, currentUser.id);
+    
+    // Periodically clean stale editing states (every 2 minutes)
+    const cleanupInterval = setInterval(() => {
+      clearStaleEditingStates(sessionId, 2); // Clear editing states older than 2 minutes
+    }, 120000); // Run every 2 minutes
+    
+    // Clean stale editing states on mount
+    clearStaleEditingStates(sessionId, 2);
+    
+    return () => {
+      clearInterval(cleanupInterval);
+    };
+  }, [sessionId, currentUser.id]);
 
   return (
     <div 
