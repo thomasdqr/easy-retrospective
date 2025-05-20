@@ -13,6 +13,8 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
   sessionId
 }) => {
   const [guessInput, setGuessInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   
   const state = gameState.users[userId];
   const user = users[userId];
@@ -80,16 +82,30 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
     .map(([guesserUserId]) => users[guesserUserId]?.name || 'Unknown')
     : [];
 
-  const handleSubmitGuess = () => {
+  const handleSubmitGuess = async () => {
     if (!guessInput.trim()) {
       alert('Please enter your guess!');
       return;
     }
-    
-    if (handleGuess) {
-      handleGuess(userId, guessInput.trim());
+
+    if (isSubmitting) {
+      return; // Prevent multiple submissions
     }
-    setGuessInput('');
+    
+    setIsSubmitting(true);
+    setSubmitError(null);
+    
+    try {
+      if (handleGuess) {
+        await handleGuess(userId, guessInput.trim());
+        setGuessInput('');
+      }
+    } catch (error) {
+      console.error('Error submitting guess:', error);
+      setSubmitError('Failed to submit guess. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleCorrectGuess = async (voterId: string) => {
@@ -158,15 +174,23 @@ const UserDrawings: React.FC<UserStatementsProps> = ({
               onChange={(e) => setGuessInput(e.target.value)}
               placeholder="Enter your guess..."
               className="flex-1 p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              onKeyPress={(e) => e.key === 'Enter' && handleSubmitGuess()}
+              onKeyPress={(e) => e.key === 'Enter' && !isSubmitting && handleSubmitGuess()}
+              disabled={isSubmitting}
             />
             <button
               onClick={handleSubmitGuess}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-md font-medium shadow-md hover:bg-indigo-700 transition-colors"
+              className={`px-6 py-3 ${isSubmitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md font-medium shadow-md transition-colors`}
+              disabled={isSubmitting}
             >
-              Submit Guess
+              {isSubmitting ? 'Submitting...' : 'Submit Guess'}
             </button>
           </div>
+          
+          {submitError && (
+            <div className="mt-2 text-red-600 text-sm">
+              {submitError}
+            </div>
+          )}
           
           {/* Always show the user's guess if they've made one */}
           {hasGuessedForThisUser && (
