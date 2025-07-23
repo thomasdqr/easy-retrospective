@@ -97,7 +97,7 @@ const DRAWING_COLORS = [
   '#000000'  // Black
 ];
 
-function Whiteboard({ sessionId, currentUser, users, isRevealed = true, onToggleReveal, isVotingPhase: externalVotingPhase, onVotingEnd }: WhiteboardProps) {
+function Whiteboard({ sessionId, currentUser, users, isRevealed = false, onToggleReveal, isVotingPhase: externalVotingPhase, onVotingEnd }: WhiteboardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater>>();
   const [realtimeCursors, setRealtimeCursors] = useState<Record<string, CursorData>>({});

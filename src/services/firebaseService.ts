@@ -96,7 +96,7 @@ export const createSession = async (sessionId: string, icebreakerType: Icebreake
       
       console.log('Setting up Realtime DB path:', `sessions/${sessionId}/isRevealed`);
       const revealedRef = ref(realtimeDb, `sessions/${sessionId}/isRevealed`);
-      await set(revealedRef, true);
+      await set(revealedRef, false);
       
       // Also set the icebreakerType in the Realtime DB
       console.log('Setting up Realtime DB path:', `sessions/${sessionId}/icebreakerType`);

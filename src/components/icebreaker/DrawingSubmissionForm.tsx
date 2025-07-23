@@ -16,8 +16,26 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
   const [brushColor, setBrushColor] = useState('#000');
   const [isEraser, setIsEraser] = useState(false);
 
-  // Colors for the palette
-  const colors = ['#000', '#f44336', '#2196f3', '#4caf50', '#ffeb3b', '#ff9800', '#9c27b0'];
+  // State for color picker
+  const [showColorPicker, setShowColorPicker] = useState(false);
+
+  // Common colors for quick access
+  const commonColors = ['#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#800080', '#008000', '#ffc0cb'];
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.color-picker-container')) {
+        setShowColorPicker(false);
+      }
+    };
+
+    if (showColorPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showColorPicker]);
 
   // Resize the canvas to match its container
   const resizeCanvas = () => {
@@ -162,18 +180,90 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
       <div className="mb-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
-            {colors.map(color => (
+            {/* Current color indicator */}
+            <div className="relative color-picker-container">
               <button
-                key={color}
-                onClick={() => { setBrushColor(color); setIsEraser(false); }}
-                className={`w-8 h-8 rounded-full ${brushColor === color && !isEraser ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
-                style={{ backgroundColor: color }}
-                aria-label={`Select ${color} color`}
+                type="button"
+                onClick={() => setShowColorPicker(!showColorPicker)}
+                className={`w-10 h-10 rounded-full border-2 border-gray-300 ${brushColor === '#ffffff' ? 'border-gray-600' : ''} ${!isEraser ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+                style={{ backgroundColor: brushColor }}
+                aria-label="Select color"
               />
-            ))}
+              
+              {/* Color picker dropdown */}
+              {showColorPicker && (
+                <div className="absolute top-12 left-0 z-10 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-72">
+                  {/* Common colors */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Common Colors</h4>
+                    <div className="grid grid-cols-6 gap-2">
+                      {commonColors.map(color => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => { 
+                            setBrushColor(color); 
+                            setIsEraser(false); 
+                            setShowColorPicker(false);
+                          }}
+                          className={`w-8 h-8 rounded-full border border-gray-300 hover:scale-110 transition-transform ${
+                            brushColor === color && !isEraser ? 'ring-2 ring-offset-1 ring-blue-500' : ''
+                          } ${color === '#ffffff' ? 'border-gray-600' : ''}`}
+                          style={{ backgroundColor: color }}
+                          aria-label={`Select ${color} color`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Hex color input */}
+                  <div className="mb-3">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Custom Color</h4>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={brushColor}
+                        onChange={(e) => {
+                          setBrushColor(e.target.value);
+                          setIsEraser(false);
+                        }}
+                        className="w-12 h-8 rounded border border-gray-300 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={brushColor}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value.match(/^#[0-9A-Fa-f]{0,6}$/)) {
+                            setBrushColor(value);
+                            setIsEraser(false);
+                          }
+                        }}
+                        placeholder="#000000"
+                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Apply and close buttons */}
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowColorPicker(false)}
+                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <button
+              type="button"
               onClick={toggleEraser}
-              className={`ml-2 px-3 py-1 text-sm border border-gray-300 rounded ${isEraser ? 'bg-gray-200 font-bold' : 'bg-white'}`}
+              className={`ml-2 px-3 py-1 text-sm border border-gray-300 rounded ${isEraser ? 'bg-gray-200 font-bold' : 'bg-white'} hover:bg-gray-100 transition-colors`}
             >
               Eraser
             </button>
@@ -203,8 +293,9 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
         </div>
         <div className="mt-2 flex justify-end">
           <button
+            type="button"
             onClick={clearCanvas}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
           >
             Clear Canvas
           </button>
@@ -228,6 +319,7 @@ const DrawingSubmissionForm: React.FC<SubmissionFormProps> = ({
       </div>
 
       <button
+        type="button"
         onClick={handleSubmit}
         className="w-full bg-indigo-600 text-white px-6 py-3 rounded-md font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200"
       >
