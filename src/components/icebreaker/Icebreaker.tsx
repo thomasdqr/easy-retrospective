@@ -2,6 +2,7 @@ import React from 'react';
 import { IcebreakerProps } from './types';
 import TwoTruthsOneLie from './implementations/TwoTruthsOneLie';
 import DrawYourWeekend from './implementations/DrawYourWeekend';
+import MusicShare from './implementations/MusicShare.tsx';
 
 const Icebreaker: React.FC<IcebreakerProps> = (props) => {
   // Route to the appropriate icebreaker implementation based on the type
@@ -10,6 +11,8 @@ const Icebreaker: React.FC<IcebreakerProps> = (props) => {
       return <TwoTruthsOneLie {...props} />;
     case 'draw-your-weekend':
       return <DrawYourWeekend {...props} />;
+    case 'music-share':
+      return <MusicShare {...props} />;
     default:
       console.error('Unknown icebreaker type:', props.icebreakerType);
       return null;

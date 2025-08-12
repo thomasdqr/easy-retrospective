@@ -69,6 +69,11 @@ export const checkAllSubmitted = (gameState: IcebreakerGameState, users: Record<
     if (userState.drawing) {
       return userState.drawing.imageData !== '' && userState.drawing.description.trim() !== '';
     }
+
+    // Check for music (MusicShare)
+    if (userState.music) {
+      return userState.music.videoId && userState.music.videoId.trim() !== '';
+    }
     
     return false;
   });

@@ -14,11 +14,23 @@ export interface Drawing {
   correctGuesses: { [userId: string]: boolean };
 }
 
+export interface MusicShareItem {
+  url: string; // YouTube URL
+  videoId: string; // extracted YouTube video id for embed
+  title?: string;
+  revealed: boolean;
+  // who guessed this song belongs to whom: voterId -> guessedUserId
+  guesses?: { [voterId: string]: string };
+  // correctness tracked similarly for quick UI badges
+  correctGuesses?: { [voterId: string]: boolean };
+}
+
 export interface PlayerState {
   statements?: {
     [key: string]: Statement;
   };
   drawing?: Drawing;
+  music?: MusicShareItem;
   votes?: { [voterId: string]: string | number };
   score: number;
   statementOrder?: number[];

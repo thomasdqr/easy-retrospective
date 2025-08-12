@@ -22,6 +22,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({ users, gameState }) => {
       return userState.drawing.imageData !== '' && userState.drawing.description.trim() !== '';
     }
 
+    // Check for music (MusicShare)
+    if (userState.music) {
+      return !!(userState.music.videoId && userState.music.videoId.trim() !== '');
+    }
+
     return false;
   };
 

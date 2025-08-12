@@ -5,11 +5,12 @@ import { UserMinus, ChevronUp, ChevronDown } from 'lucide-react';
 import { subscribeToIcebreakerState } from '../services/realtimeDbService';
 import { useEffect, useState } from 'react';
 import { getValidUserIds } from '../components/icebreaker/utils';
-import { IcebreakerGameState, Statement, PlayerState } from '../components/icebreaker/types';
+import { IcebreakerGameState, Statement, PlayerState, MusicShareItem } from '../components/icebreaker/types';
 import { Drawing } from '../components/icebreaker/types';
 
 interface ExtendedPlayerState extends PlayerState {
   drawing?: Drawing;
+  music?: MusicShareItem;
   statements?: {
     "0": Statement;
     "1": Statement;
@@ -38,31 +39,34 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
   useEffect(() => {
     const unsubscribe = subscribeToIcebreakerState(sessionId, (state) => {
       if (state) {
+        
         // Convert the state to our extended type
         const extendedState: ExtendedGameState = {
           ...state,
           users: state.users as Record<string, ExtendedPlayerState>
         };
+        
         setGameState(extendedState);
         
         // Check if we're in the voting phase (all users have submitted but not all have voted)
         const validUserIds = getValidUserIds(users);
         
-        // Check if all users have submitted
+        
+          // Check if all users have submitted
         const allSubmitted = validUserIds.every(userId => {
           const userState = extendedState.users[userId];
           if (!userState) return false;
           
-          // Check for either statements (TwoTruthsOneLie) or drawing (DrawYourWeekend)
+          // Determine submission per icebreaker flavor
+          // IMPORTANT: check music/drawing before statements since MusicShare uses placeholder statements
           let hasSubmitted = false;
-          
-          if (userState.drawing) {
-            // For DrawYourWeekend, check drawing data
+          if (userState.music) {
+            hasSubmitted = Boolean(userState.music.videoId);
+          } else if (userState.drawing) {
             hasSubmitted = userState.drawing && 
                           userState.drawing.imageData !== '' && 
                           userState.drawing.description.trim() !== '';
           } else if (userState.statements) {
-            // For TwoTruthsOneLie, check statements
             hasSubmitted = Object.values(userState.statements).every(
               (s: Statement) => s && s.text && s.text.trim().length > 0
             );
@@ -72,20 +76,28 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
         });
 
 
-        // Check if all votes are complete
-        const allVotesComplete = validUserIds.every(userId => {
-          // Count how many votes this user has cast (not received)
-          const votesCast = validUserIds.filter(targetId => {
-            // Skip self
-            if (targetId === userId) return false;
-            
-            const targetUserState = extendedState.users[targetId];
-            return targetUserState?.votes && targetUserState.votes[userId] !== undefined;
-          }).length;
-          
-          // User has completed voting if they've cast votes for all other users
-          return votesCast >= validUserIds.length - 1;
+        // Check if all votes/associations are complete
+        // For association-based games (draw-your-weekend, music-share), votes are kept on the voter
+        // For two-truths-one-lie, votes are kept on the target
+        const isAssociationType = validUserIds.some(id => {
+          const st = extendedState.users[id];
+          return Boolean(st?.drawing) || Boolean((st as unknown as { music?: unknown }).music);
         });
+
+        const allVotesComplete = isAssociationType
+          ? validUserIds.every(uid => {
+              const votesCast = Object.keys(extendedState.users[uid]?.votes || {}).filter(tid => tid !== uid && validUserIds.includes(tid)).length;
+              return votesCast >= validUserIds.length - 1;
+            })
+          : validUserIds.every(userId => {
+              // Count how many votes this user has cast (not received) for TTL
+              const votesCast = validUserIds.filter(targetId => {
+                if (targetId === userId) return false;
+                const targetUserState = extendedState.users[targetId];
+                return targetUserState?.votes && targetUserState.votes[userId] !== undefined;
+              }).length;
+              return votesCast >= validUserIds.length - 1;
+            });
         
         const isVotingPhase = allSubmitted && !allVotesComplete;
         setIsIcebreakerVotingPhase(isVotingPhase);
@@ -107,7 +119,7 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
     await removeUserFromSession(sessionId, userId);
   };
 
-  // Function to get voting progress for a user during the icebreaker voting phase
+  // Function to get voting/association progress for a user during the icebreaker voting phase
   const getVotingProgress = (userId: string) => {
     if (!gameState || !gameState.users || !isIcebreakerVotingPhase) {
       return null;
@@ -118,7 +130,10 @@ function UserList({ users, sessionId, currentUser }: UserListProps) {
     const totalPossibleVotes = actualValidUserIds.length - 1;
     
     if (gameState.users[userId]?.drawing) {
-      const votesCast = Object.keys(gameState.users[userId]?.votes || {}).length;
+      const votesCast = Object.keys(gameState.users[userId]?.votes || {}).filter(tid => tid !== userId && actualValidUserIds.includes(tid)).length;
+      return { votesCast, totalPossibleVotes };
+    } else if (gameState.users[userId]?.music) {
+      const votesCast = Object.keys(gameState.users[userId]?.votes || {}).filter(tid => tid !== userId && actualValidUserIds.includes(tid)).length;
       return { votesCast, totalPossibleVotes };
     } else if (gameState.users[userId]?.statements) {
       // if the game is TwoTruthsOneLie, count votes made BY this user on other users

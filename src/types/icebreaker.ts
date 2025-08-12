@@ -1,4 +1,4 @@
-export type IcebreakerType = 'two-truths-one-lie' | 'draw-your-weekend';
+export type IcebreakerType = 'two-truths-one-lie' | 'draw-your-weekend' | 'music-share';
 
 export interface IcebreakerConfig {
   type: IcebreakerType;
@@ -16,6 +16,11 @@ export const ICEBREAKER_TYPES: IcebreakerConfig[] = [
     type: 'draw-your-weekend',
     name: 'Draw your week end',
     description: 'Draw something that represents your weekend.'
+  },
+  {
+    type: 'music-share',
+    name: 'Music Share',
+    description: 'Share a recent song via YouTube link, then guess who shared which track.'
   }
 ];
 

@@ -11,9 +11,14 @@ const RevealButton: React.FC<RevealButtonProps> = ({
     return null;
   }
 
-  const label = icebreakerType === 'two-truths-one-lie'
-    ? 'Reveal Truth & Lie'
-    : 'Reveal Drawing Results';
+  let label = 'Reveal';
+  if (icebreakerType === 'two-truths-one-lie') {
+    label = 'Reveal Truth & Lie';
+  } else if (icebreakerType === 'draw-your-weekend') {
+    label = 'Reveal Drawing Results';
+  } else if (icebreakerType === 'music-share') {
+    label = 'Reveal Song Owner & Scores';
+  }
 
   return (
     <div className="mt-8 text-center">

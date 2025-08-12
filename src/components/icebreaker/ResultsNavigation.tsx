@@ -25,10 +25,14 @@ const ResultsNavigation: React.FC<ResultsNavigationProps> = ({
       )}
       
       <span className="font-medium text-gray-700">
-        {gameState.activeUser && users[gameState.activeUser] 
+        {gameState.activeUser && users[gameState.activeUser]
           ? icebreakerType === 'two-truths-one-lie'
             ? `Showing ${gameState.revealed ? 'results' : 'votes'} for ${users[gameState.activeUser].name}`
-            : `Showing ${gameState.revealed ? 'results' : 'guesses'} for ${users[gameState.activeUser].name}`
+            : icebreakerType === 'draw-your-weekend'
+              ? `Showing ${gameState.revealed ? 'results' : 'guesses'} for ${users[gameState.activeUser].name}`
+              : gameState.revealed
+                ? `Showing results for ${users[gameState.activeUser].name}`
+                : 'Showing associations'
           : 'Waiting for results...'}
       </span>
       
