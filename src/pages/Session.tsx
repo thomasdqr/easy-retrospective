@@ -344,18 +344,20 @@ function Session() {
           </div>
           
           <div className="absolute left-1/2 -translate-x-1/2">
-            {!isRevealed && (
-              <div className="flex items-center gap-2 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                <EyeOff className="w-4 h-4" />
-                <span>Stickies are hidden</span>
-              </div>
-            )}
-            {isVotingPhase && (
-              <div className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium ml-2">
-                <ThumbsUp className="w-4 h-4" />
-                <span>Voting in progress</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {!isRevealed && (
+                <div className="flex items-center gap-2 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                  <EyeOff className="w-4 h-4" />
+                  <span>Stickies are hidden</span>
+                </div>
+              )}
+              {isVotingPhase && (
+                <div className="flex items-center gap-2 bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium">
+                  <ThumbsUp className="w-4 h-4" />
+                  <span>Voting in progress</span>
+                </div>
+              )}
+            </div>
           </div>
           
           {currentUser?.isCreator && (
@@ -388,6 +390,7 @@ function Session() {
             onToggleReveal={currentUser.isCreator ? handleToggleReveal : undefined}
             isVotingPhase={isVotingPhase}
             onVotingEnd={handleVotingEnd}
+            icebreakerType={currentIcebreakerType || DEFAULT_ICEBREAKER}
           />
         )}
       </div>

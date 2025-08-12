@@ -1,5 +1,6 @@
 import { IcebreakerGameState } from '../components/icebreaker/types';
 import { StickyNote, User, Column } from '../types';
+import { IcebreakerType, DEFAULT_ICEBREAKER } from '../types/icebreaker';
 
 // Gemini API endpoints and models
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -10,6 +11,7 @@ interface RetroSummaryData {
   users: Record<string, User>;
   stickyNotes: Record<string, StickyNote>;
   columns?: Record<string, Column>;
+  icebreakerType?: IcebreakerType;
 }
 
 export interface GeminiApiConfig {
@@ -43,26 +45,47 @@ export const generateRetroSummary = async (data: RetroSummaryData): Promise<stri
     throw new Error('Gemini API key not configured');
   }
 
-  // Extract icebreaker statements and scores
-  const icebreakerData = Object.entries(data.icebreakerState.users).map(([userId, userData]) => {
-    const userName = data.users[userId]?.name || 'Unknown';
-    
-    // Extract the statements with their revealed status
-    const statements = userData.statements ? [
-      { text: userData.statements["0"]?.text || '', isLie: userData.statements["0"]?.isLie || false },
-      { text: userData.statements["1"]?.text || '', isLie: userData.statements["1"]?.isLie || false },
-      { text: userData.statements["2"]?.text || '', isLie: userData.statements["2"]?.isLie || false }
-    ] : [];
-    
-    return {
-      name: userName,
-      score: userData.score || 0,
-      statements
-    };
-  });
+  const icebreakerType = data.icebreakerType || DEFAULT_ICEBREAKER;
 
-  // Find the winner (highest score)
-  const winner = [...icebreakerData].sort((a, b) => b.score - a.score)[0];
+  let icebreakerSection = '';
+  let winnerLine = '';
+
+  if (icebreakerType === 'two-truths-one-lie') {
+    const ttwolData = Object.entries(data.icebreakerState.users).map(([userId, userData]) => {
+      const userName = data.users[userId]?.name || 'Unknown';
+      const statements = userData.statements ? [
+        { text: userData.statements["0"]?.text || '', isLie: userData.statements["0"]?.isLie || false },
+        { text: userData.statements["1"]?.text || '', isLie: userData.statements["1"]?.isLie || false },
+        { text: userData.statements["2"]?.text || '', isLie: userData.statements["2"]?.isLie || false }
+      ] : [];
+      return { name: userName, score: userData.score || 0, statements };
+    });
+
+    const winner = [...ttwolData].sort((a, b) => b.score - a.score)[0] || { name: 'Unknown', score: 0 };
+    winnerLine = `Winner: ${winner.name} (Score: ${winner.score})`;
+
+    icebreakerSection = `Icebreaker (Two Truths and a Lie) results:\n${ttwolData.map(user => {
+      const lies = user.statements.filter(s => s.isLie).map(s => s.text);
+      const truths = user.statements.filter(s => !s.isLie).map(s => s.text);
+      return `${user.name} (Score: ${user.score})\n- Truths: ${truths.join(', ')}\n- Lie: ${lies.join(', ')}`;
+    }).join('\n\n')}`;
+  } else {
+    const drawingData = Object.entries(data.icebreakerState.users).map(([userId, userData]) => {
+      const userName = data.users[userId]?.name || 'Unknown';
+      const description = userData.drawing?.description || '';
+      const correctGuessers = Object.entries(userData.drawing?.correctGuesses || {})
+        .filter(([, isCorrect]) => Boolean(isCorrect))
+        .map(([guesserId]) => data.users[guesserId]?.name || 'Unknown');
+      return { name: userName, score: userData.score || 0, description, correctGuessers };
+    });
+    const winner = [...drawingData].sort((a, b) => b.score - a.score)[0] || { name: 'Unknown', score: 0 };
+    winnerLine = `Top guesser: ${winner.name} (Score: ${winner.score})`;
+
+    icebreakerSection = `Icebreaker (Draw Your Weekend) results:\n${drawingData.map(user => {
+      const guessers = user.correctGuessers.length ? user.correctGuessers.join(', ') : 'None';
+      return `${user.name} (Got guessed by: ${guessers})\n- Actual weekend activity: ${user.description}`;
+    }).join('\n\n')}`;
+  }
 
   // Extract and sort sticky notes by votes
   const stickyNotesWithVotes = Object.values(data.stickyNotes).map(note => {
@@ -106,17 +129,9 @@ export const generateRetroSummary = async (data: RetroSummaryData): Promise<stri
   const prompt = `
     Generate a fun and professional retrospective summary with the following data:
     
-    Icebreaker (Two Truths and a Lie) results:
-    ${icebreakerData.map(user => {
-      const lies = user.statements.filter(s => s.isLie).map(s => s.text);
-      const truths = user.statements.filter(s => !s.isLie).map(s => s.text);
-      
-      return `${user.name} (Score: ${user.score})
-      - Truths: ${truths.join(', ')}
-      - Lie: ${lies.join(', ')}`;
-    }).join('\n\n')}
+    ${icebreakerSection}
     
-    Winner: ${winner.name} (Score: ${winner.score})
+    ${winnerLine}
     
     Retrospective feedback by category:
     ${Object.values(stickyNotesByColumn).map(column => {
@@ -128,6 +143,8 @@ export const generateRetroSummary = async (data: RetroSummaryData): Promise<stri
     1. A fun introduction mentioning the icebreaker activity with a title using markdown heading (##). 
        IMPORTANT: In "Two Truths and a Lie", a high score means the person was GOOD at detecting the lies, 
        not bad at it. Highlight the winner as the best detective ! Include 1-2 interesting or funny statements from participants.
+       If the activity was Draw Your Weekend, celebrate creative drawings and sharp guessers; highlight the top guesser.
+       Include 1-2 interesting or funny highlights from participants.
     
     ${Object.values(stickyNotesByColumn).map((column, index) => {
       return `${index + 2}. Key insights from "${column.columnTitle}" (most voted items) with a section heading using markdown (##)`;

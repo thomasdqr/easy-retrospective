@@ -707,6 +707,7 @@ const DrawYourWeekend: React.FC<IcebreakerProps> = ({ sessionId, currentUser, us
                     currentUser={currentUser}
                     gameState={gameState}
                     handleReveal={handleReveal}
+                    icebreakerType="draw-your-weekend"
                   />
                 </div>
               )}

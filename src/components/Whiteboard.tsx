@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { User, StickyNote, Column } from '../types';
+import { IcebreakerType } from '../types/icebreaker';
 import { Focus, Eye, EyeOff, Plus, Edit, Trash, Check, X, ThumbsUp, PencilLine, Eraser, Brain, ZoomIn, ZoomOut, Move, StickyNoteIcon } from 'lucide-react';
 import StickyNoteComponent from './StickyNote';
 import RetroSummary from './RetroSummary';
@@ -43,6 +44,7 @@ interface WhiteboardProps {
   onToggleReveal?: () => void;
   isVotingPhase?: boolean;
   onVotingEnd?: (hasVotes: boolean) => void;
+  icebreakerType: IcebreakerType;
 }
 
 // Add interface for cursor data
@@ -97,9 +99,9 @@ const DRAWING_COLORS = [
   '#000000'  // Black
 ];
 
-function Whiteboard({ sessionId, currentUser, users, isRevealed = false, onToggleReveal, isVotingPhase: externalVotingPhase, onVotingEnd }: WhiteboardProps) {
+function Whiteboard({ sessionId, currentUser, users, isRevealed = false, onToggleReveal, isVotingPhase: externalVotingPhase, onVotingEnd, icebreakerType }: WhiteboardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
-  const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater>>();
+  const cursorUpdateRef = useRef<ReturnType<typeof createCursorUpdater> | undefined>(undefined);
   const [realtimeCursors, setRealtimeCursors] = useState<Record<string, CursorData>>({});
   const [stickyNotes, setStickyNotes] = useState<Record<string, StickyNote>>({});
   const [columns, setColumns] = useState<Record<string, Column>>({});
@@ -940,7 +942,27 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = false, onToggl
   useEffect(() => {
     const unsubscribe = subscribeToIcebreakerState(sessionId, (state) => {
       if (state) {
-        setIcebreakerState(state);
+        const gameUsers: { [userId: string]: { score: number; votes: Record<string, number | string>; revealed: boolean; drawing?: import('./icebreaker/types').Drawing; statements?: Record<string, import('./icebreaker/types').Statement>; statementOrder?: number[] } } = {};
+        Object.entries(state.users || {}).forEach(([userId, user]: [string, { score?: number; votes?: Record<string, number | string>; revealed?: boolean; statementOrder?: number[]; drawing?: import('./icebreaker/types').Drawing; statements?: Record<string, import('./icebreaker/types').Statement> }]) => {
+          const drawing = user.drawing;
+          const statements = user.statements;
+          gameUsers[userId] = {
+            score: user.score || 0,
+            votes: user.votes || {},
+            revealed: user.revealed || false,
+            drawing,
+            statements,
+            statementOrder: user.statementOrder || undefined
+          };
+        });
+        setIcebreakerState({
+          users: gameUsers,
+          activeUser: state.activeUser || null,
+          revealed: state.revealed || false,
+          finalLeaderboard: state.finalLeaderboard || false,
+          retrospectiveStarted: state.retrospectiveStarted || false,
+          completed: state.completed || false
+        });
       }
     });
     
@@ -1665,6 +1687,7 @@ function Whiteboard({ sessionId, currentUser, users, isRevealed = false, onToggl
           users={users}
           stickyNotes={stickyNotes}
           columns={columns}
+          icebreakerType={icebreakerType}
           onClose={() => setShowSummary(false)}
         />
       )}

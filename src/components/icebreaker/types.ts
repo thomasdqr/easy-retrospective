@@ -85,6 +85,7 @@ export interface RevealButtonProps {
   currentUser: User;
   gameState: IcebreakerGameState;
   handleReveal: () => void;
+  icebreakerType?: IcebreakerType;
 }
 
 export interface LeaderboardProps {
